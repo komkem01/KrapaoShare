@@ -14,12 +14,23 @@ export default function SharedGoalsPage() {
       targetAmount: 150000,
       currentAmount: 45000,
       targetDate: '2026-03-15',
+      description: 'ทริปเที่ยวญี่ปุ่น 10 วัน ช่วงซากุระบาน',
+      category: 'ท่องเที่ยว',
+      createdDate: '2025-10-01',
       members: [
-        { name: 'คุณ', amount: 25000 },
-        { name: 'มิกิ', amount: 15000 },
-        { name: 'โยชิ', amount: 5000 }
+        { name: 'คุณ', amount: 25000, target: 50000, joinDate: '2025-10-01' },
+        { name: 'มิกิ', amount: 15000, target: 50000, joinDate: '2025-10-05' },
+        { name: 'โยชิ', amount: 5000, target: 50000, joinDate: '2025-10-10' }
       ],
-      createdBy: 'คุณ'
+      recentActivity: [
+        { date: '2025-11-10', member: 'มิกิ', amount: 5000, type: 'deposit' },
+        { date: '2025-11-08', member: 'คุณ', amount: 10000, type: 'deposit' },
+        { date: '2025-11-05', member: 'โยศิ', amount: 5000, type: 'deposit' }
+      ],
+      createdBy: 'คุณ',
+      isPublic: false,
+      autoSave: true,
+      monthlyTarget: 15000
     },
     {
       id: 2,
@@ -27,12 +38,23 @@ export default function SharedGoalsPage() {
       targetAmount: 300000,
       currentAmount: 120000,
       targetDate: '2025-12-31',
+      description: 'รถยนต์มือสองสำหรับใช้ร่วมกัน',
+      category: 'รถยนต์',
+      createdDate: '2025-09-01',
       members: [
-        { name: 'คุณ', amount: 60000 },
-        { name: 'แอน', amount: 40000 },
-        { name: 'บิว', amount: 20000 }
+        { name: 'คุณ', amount: 60000, target: 100000, joinDate: '2025-09-01' },
+        { name: 'แอน', amount: 40000, target: 100000, joinDate: '2025-09-15' },
+        { name: 'บิว', amount: 20000, target: 100000, joinDate: '2025-10-01' }
       ],
-      createdBy: 'คุณ'
+      recentActivity: [
+        { date: '2025-11-12', member: 'บิว', amount: 20000, type: 'deposit' },
+        { date: '2025-11-01', member: 'คุณ', amount: 30000, type: 'deposit' },
+        { date: '2025-10-15', member: 'แอน', amount: 40000, type: 'deposit' }
+      ],
+      createdBy: 'คุณ',
+      isPublic: false,
+      autoSave: false,
+      monthlyTarget: 25000
     }
   ];
 
@@ -43,13 +65,49 @@ export default function SharedGoalsPage() {
       targetAmount: 200000,
       currentAmount: 85000,
       targetDate: '2025-08-20',
+      description: 'งานแต่งงานแอนกับเจมส์ที่รีสอร์ทเขาใหญ่',
+      category: 'งานรื่นเริง',
+      createdDate: '2025-06-01',
       members: [
-        { name: 'แอน', amount: 50000 },
-        { name: 'คุณ', amount: 15000 },
-        { name: 'มิกิ', amount: 10000 },
-        { name: 'บิว', amount: 10000 }
+        { name: 'แอน', amount: 50000, target: 80000, joinDate: '2025-06-01' },
+        { name: 'คุณ', amount: 15000, target: 40000, joinDate: '2025-06-15' },
+        { name: 'มิกิ', amount: 10000, target: 40000, joinDate: '2025-06-20' },
+        { name: 'บิว', amount: 10000, target: 40000, joinDate: '2025-07-01' }
       ],
-      createdBy: 'แอน'
+      recentActivity: [
+        { date: '2025-11-05', member: 'แอน', amount: 15000, type: 'deposit' },
+        { date: '2025-10-20', member: 'คุณ', amount: 15000, type: 'deposit' },
+        { date: '2025-10-15', member: 'มิกิ', amount: 10000, type: 'deposit' }
+      ],
+      createdBy: 'แอน',
+      isPublic: true,
+      autoSave: true,
+      monthlyTarget: 20000
+    },
+    {
+      id: 4,
+      name: 'ปาร์ตี้รับปริญญาร่วม',
+      targetAmount: 50000,
+      currentAmount: 32000,
+      targetDate: '2026-05-15',
+      description: 'ปาร์ตี้ฉลองรับปริญญาของกลุ่มเพื่อน',
+      category: 'งานรื่นเริง',
+      createdDate: '2025-08-01',
+      members: [
+        { name: 'นิค', amount: 15000, target: 12500, joinDate: '2025-08-01' },
+        { name: 'คุณ', amount: 8000, target: 12500, joinDate: '2025-08-15' },
+        { name: 'เจน', amount: 9000, target: 12500, joinDate: '2025-09-01' },
+        { name: 'ปีเตอร์', amount: 0, target: 12500, joinDate: '2025-09-15' }
+      ],
+      recentActivity: [
+        { date: '2025-11-01', member: 'เจน', amount: 4000, type: 'deposit' },
+        { date: '2025-10-25', member: 'คุณ', amount: 8000, type: 'deposit' },
+        { date: '2025-10-10', member: 'นิค', amount: 15000, type: 'deposit' }
+      ],
+      createdBy: 'นิค',
+      isPublic: false,
+      autoSave: false,
+      monthlyTarget: 5000
     }
   ];
 
@@ -173,22 +231,105 @@ export default function SharedGoalsPage() {
                 </p>
               </div>
 
-              {/* Members */}
+              {/* Members with Individual Progress */}
               <div className="mb-4">
                 <h4 className="text-sm font-medium text-gray-900 dark:text-white mb-2">
                   สมาชิก ({goal.members.length} คน)
                 </h4>
-                <div className="space-y-2">
-                  {goal.members.map((member, index) => (
-                    <div key={index} className="flex justify-between items-center py-2 px-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
-                      <span className="text-sm text-gray-900 dark:text-white font-medium">
-                        {member.name}
-                      </span>
-                      <span className="text-sm text-gray-600 dark:text-gray-400">
-                        ฿{member.amount.toLocaleString()}
-                      </span>
-                    </div>
-                  ))}
+                <div className="space-y-3">
+                  {goal.members.map((member, index) => {
+                    const memberProgress = (member.amount / member.target) * 100;
+                    return (
+                      <div key={index} className="py-3 px-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                        <div className="flex justify-between items-center mb-2">
+                          <div className="flex items-center space-x-2">
+                            <span className={`text-sm font-medium ${member.name === 'คุณ' ? 'text-blue-600 dark:text-blue-400' : 'text-gray-900 dark:text-white'}`}>
+                              {member.name}
+                            </span>
+                            {member.name === goal.createdBy && (
+                              <span className="bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-200 text-xs px-2 py-1 rounded">
+                                ผู้สร้าง
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-right">
+                            <span className="text-sm font-medium text-gray-900 dark:text-white">
+                              ฿{member.amount.toLocaleString()}
+                            </span>
+                            <span className="text-xs text-gray-500 dark:text-gray-400">
+                              / ฿{member.target.toLocaleString()}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="w-full bg-gray-200 dark:bg-gray-600 rounded-full h-2">
+                          <div 
+                            className={`h-2 rounded-full transition-all duration-300 ${
+                              memberProgress >= 100 ? 'bg-green-500' : 'bg-blue-500'
+                            }`}
+                            style={{width: `${Math.min(memberProgress, 100)}%`}}
+                          ></div>
+                        </div>
+                        <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400 mt-1">
+                          <span>เข้าร่วม: {new Date(member.joinDate).toLocaleDateString('th-TH')}</span>
+                          <span>{Math.round(memberProgress)}%</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Recent Activity */}
+              {goal.recentActivity && (
+                <div className="mb-4">
+                  <h4 className="text-sm font-medium text-gray-900 dark:text-white mb-2">
+                    กิจกรรมล่าสุด
+                  </h4>
+                  <div className="space-y-2">
+                    {goal.recentActivity.slice(0, 3).map((activity, index) => (
+                      <div key={index} className="flex items-center justify-between py-2 px-3 bg-gray-50 dark:bg-gray-700 rounded text-sm">
+                        <div className="flex items-center space-x-2">
+                          <span className="text-green-600 dark:text-green-400">💰</span>
+                          <span className="text-gray-900 dark:text-white">
+                            {activity.member}
+                          </span>
+                          <span className="text-gray-600 dark:text-gray-400">
+                            ฝากเงิน
+                          </span>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-green-600 dark:text-green-400 font-medium">
+                            +฿{activity.amount.toLocaleString()}
+                          </div>
+                          <div className="text-xs text-gray-500 dark:text-gray-400">
+                            {new Date(activity.date).toLocaleDateString('th-TH')}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Goal Details */}
+              <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-900 rounded-lg">
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <span className="text-blue-800 dark:text-blue-200 font-medium">หมวดหมู่:</span>
+                    <span className="text-blue-900 dark:text-blue-100 ml-2">{goal.category}</span>
+                  </div>
+                  <div>
+                    <span className="text-blue-800 dark:text-blue-200 font-medium">เป้าหมายต่อเดือน:</span>
+                    <span className="text-blue-900 dark:text-blue-100 ml-2">฿{goal.monthlyTarget.toLocaleString()}</span>
+                  </div>
+                  <div>
+                    <span className="text-blue-800 dark:text-blue-200 font-medium">สร้างเมื่อ:</span>
+                    <span className="text-blue-900 dark:text-blue-100 ml-2">{new Date(goal.createdDate).toLocaleDateString('th-TH')}</span>
+                  </div>
+                  <div>
+                    <span className="text-blue-800 dark:text-blue-200 font-medium">ออโต้เซฟ:</span>
+                    <span className="text-blue-900 dark:text-blue-100 ml-2">{goal.autoSave ? '✅ เปิด' : '❌ ปิด'}</span>
+                  </div>
                 </div>
               </div>
 
@@ -214,13 +355,23 @@ export default function SharedGoalsPage() {
                   <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-1">
                     {goal.name}
                   </h3>
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">
+                    {goal.description}
+                  </p>
                   <p className="text-sm text-gray-500 dark:text-gray-400">
                     เป้าหมาย: {new Date(goal.targetDate).toLocaleDateString('th-TH')}
                   </p>
                 </div>
-                <span className="bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200 text-xs font-medium px-2.5 py-0.5 rounded">
-                  สร้างโดย {goal.createdBy}
-                </span>
+                <div className="text-right">
+                  <span className="bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200 text-xs font-medium px-2.5 py-0.5 rounded block mb-2">
+                    สร้างโดย {goal.createdBy}
+                  </span>
+                  {goal.isPublic && (
+                    <span className="bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 text-xs font-medium px-2.5 py-0.5 rounded">
+                      🌐 สาธารณะ
+                    </span>
+                  )}
+                </div>
               </div>
 
               {/* Progress */}
@@ -242,29 +393,93 @@ export default function SharedGoalsPage() {
                 </p>
               </div>
 
-              {/* Members */}
+              {/* Members with Individual Progress */}
               <div className="mb-4">
                 <h4 className="text-sm font-medium text-gray-900 dark:text-white mb-2">
                   สมาชิก ({goal.members.length} คน)
                 </h4>
-                <div className="space-y-2">
-                  {goal.members.map((member, index) => (
-                    <div key={index} className="flex justify-between items-center py-2 px-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
-                      <span className={`text-sm font-medium ${member.name === 'คุณ' ? 'text-blue-600 dark:text-blue-400' : 'text-gray-900 dark:text-white'}`}>
-                        {member.name}
-                      </span>
-                      <span className="text-sm text-gray-600 dark:text-gray-400">
-                        ฿{member.amount.toLocaleString()}
-                      </span>
-                    </div>
-                  ))}
+                <div className="space-y-3">
+                  {goal.members.map((member, index) => {
+                    const memberProgress = (member.amount / member.target) * 100;
+                    return (
+                      <div key={index} className="py-3 px-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                        <div className="flex justify-between items-center mb-2">
+                          <div className="flex items-center space-x-2">
+                            <span className={`text-sm font-medium ${member.name === 'คุณ' ? 'text-blue-600 dark:text-blue-400' : 'text-gray-900 dark:text-white'}`}>
+                              {member.name}
+                            </span>
+                            {member.name === goal.createdBy && (
+                              <span className="bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-200 text-xs px-2 py-1 rounded">
+                                ผู้สร้าง
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-right">
+                            <span className="text-sm font-medium text-gray-900 dark:text-white">
+                              ฿{member.amount.toLocaleString()}
+                            </span>
+                            <span className="text-xs text-gray-500 dark:text-gray-400">
+                              / ฿{member.target.toLocaleString()}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="w-full bg-gray-200 dark:bg-gray-600 rounded-full h-2">
+                          <div 
+                            className={`h-2 rounded-full transition-all duration-300 ${
+                              memberProgress >= 100 ? 'bg-green-500' : 'bg-blue-500'
+                            }`}
+                            style={{width: `${Math.min(memberProgress, 100)}%`}}
+                          ></div>
+                        </div>
+                        <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400 mt-1">
+                          <span>เข้าร่วม: {new Date(member.joinDate).toLocaleDateString('th-TH')}</span>
+                          <span>{Math.round(memberProgress)}%</span>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
+
+              {/* Recent Activity */}
+              {goal.recentActivity && (
+                <div className="mb-4">
+                  <h4 className="text-sm font-medium text-gray-900 dark:text-white mb-2">
+                    กิจกรรมล่าสุด
+                  </h4>
+                  <div className="space-y-2">
+                    {goal.recentActivity.slice(0, 3).map((activity, index) => (
+                      <div key={index} className="flex items-center justify-between py-2 px-3 bg-gray-50 dark:bg-gray-700 rounded text-sm">
+                        <div className="flex items-center space-x-2">
+                          <span className="text-green-600 dark:text-green-400">💰</span>
+                          <span className="text-gray-900 dark:text-white">
+                            {activity.member}
+                          </span>
+                          <span className="text-gray-600 dark:text-gray-400">
+                            ฝากเงิน
+                          </span>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-green-600 dark:text-green-400 font-medium">
+                            +฿{activity.amount.toLocaleString()}
+                          </div>
+                          <div className="text-xs text-gray-500 dark:text-gray-400">
+                            {new Date(activity.date).toLocaleDateString('th-TH')}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {/* Actions */}
               <div className="flex space-x-3">
                 <button className="flex-1 bg-green-600 text-white py-2 px-4 rounded-lg hover:bg-green-700 transition-colors text-sm font-medium">
                   โอนเงินเข้า
+                </button>
+                <button className="px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors text-sm">
+                  ออกจากกลุ่ม
                 </button>
                 <button className="px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors text-sm">
                   ดูรายละเอียด
