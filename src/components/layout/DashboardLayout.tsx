@@ -12,6 +12,7 @@ interface DashboardLayoutProps {
 
 export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
   const pathname = usePathname();
   
   const {
@@ -24,6 +25,20 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
     markAllAsRead,
     deleteNotification
   } = useNotifications();
+
+  const handleLogout = () => {
+    console.log('Logout clicked, showing modal...');
+    setShowLogoutModal(true);
+  };
+
+  const confirmLogout = () => {
+    // Clear any stored auth data here if needed
+    window.location.href = '/auth/login';
+  };
+
+  const cancelLogout = () => {
+    setShowLogoutModal(false);
+  };
 
   const navigation = [
     { 
@@ -191,12 +206,12 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                 )}
               </button>
               
-              <Link 
-                href="/"
-                className="text-sm text-gray-500 hover:text-gray-600 dark:text-gray-400 dark:hover:text-gray-300"
+              <button
+                onClick={handleLogout}
+                className="text-sm text-gray-500 hover:text-gray-600 dark:text-gray-400 dark:hover:text-gray-300 transition-colors"
               >
                 ออกจากระบบ
-              </Link>
+              </button>
             </div>
           </div>
         </div>
@@ -216,6 +231,49 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
         onMarkAllAsRead={markAllAsRead}
         onDeleteNotification={deleteNotification}
       />
+
+      {/* Logout Confirmation Modal */}
+      {showLogoutModal && (
+        <div className="fixed inset-0 z-[60] overflow-y-auto">
+          <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+            <div className="fixed inset-0" onClick={cancelLogout}></div>
+
+            <div className="inline-block align-bottom bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm rounded-lg px-4 pt-5 pb-4 text-left overflow-hidden shadow-2xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full sm:p-6 relative z-10">
+              <div className="sm:flex sm:items-start">
+                <div className="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-red-100 dark:bg-red-900/20 sm:mx-0 sm:h-10 sm:w-10">
+                  <span className="text-xl">⚠️</span>
+                </div>
+                <div className="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left">
+                  <h3 className="text-lg leading-6 font-light text-gray-900 dark:text-white">
+                    ยืนยันการออกจากระบบ
+                  </h3>
+                  <div className="mt-2">
+                    <p className="text-sm text-gray-600 dark:text-gray-400 font-light">
+                      คุณแน่ใจหรือไม่ว่าต้องการออกจากระบบ? ข้อมูลที่ยังไม่ได้บันทึกอาจสูญหาย
+                    </p>
+                  </div>
+                </div>
+              </div>
+              <div className="mt-5 sm:mt-4 sm:flex sm:flex-row-reverse">
+                <button
+                  type="button"
+                  onClick={confirmLogout}
+                  className="w-full inline-flex justify-center rounded-lg border border-transparent shadow-sm px-4 py-2 bg-red-600 text-base font-light text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 sm:ml-3 sm:w-auto sm:text-sm transition-colors"
+                >
+                  ออกจากระบบ
+                </button>
+                <button
+                  type="button"
+                  onClick={cancelLogout}
+                  className="mt-3 w-full inline-flex justify-center rounded-lg border border-gray-300 dark:border-gray-600 shadow-sm px-4 py-2 bg-white dark:bg-gray-800 text-base font-light text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 sm:mt-0 sm:w-auto sm:text-sm transition-colors"
+                >
+                  ยกเลิก
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -9,8 +9,8 @@ import PrimaryButton from '@/components/auth/PrimaryButton';
 
 export default function LoginPage() {
   const [formData, setFormData] = useState({
-    email: '',
-    password: ''
+    email: 'user@example.com',
+    password: 'password123'
   });
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -33,9 +33,12 @@ export default function LoginPage() {
   const handleGoogleLogin = async () => {
     setLoading(true);
     try {
-      // TODO: Implement Google OAuth login
+      // Mock Google login - redirect to dashboard
       console.log('Google login clicked');
       await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate API call
+      
+      // Redirect to dashboard
+      window.location.href = '/dashboard';
     } catch (error) {
       console.error('Google login error:', error);
     } finally {
@@ -66,9 +69,12 @@ export default function LoginPage() {
     }
 
     try {
-      // TODO: Implement email/password login
+      // Mock login - redirect to dashboard
       console.log('Login form submitted:', formData);
       await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate API call
+      
+      // Redirect to dashboard
+      window.location.href = '/dashboard';
     } catch (error) {
       console.error('Login error:', error);
       setErrors({ general: 'เกิดข้อผิดพลาดในการเข้าสู่ระบบ' });
@@ -88,6 +94,14 @@ export default function LoginPage() {
           <p className="text-gray-600 dark:text-gray-400 text-sm">
             เข้าสู่ระบบเพื่อจัดการเงินของคุณ
           </p>
+          
+          {/* Mock Credentials Info */}
+          <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+            <p className="text-xs text-blue-800 dark:text-blue-200 font-light">
+              💡 <strong>สำหรับการทดสอบ UI:</strong> ข้อมูลเข้าสู่ระบบถูกกรอกไว้แล้ว<br/>
+              กดปุ่ม "เข้าสู่ระบบ" หรือ "Google" เพื่อเข้าสู่หน้า Dashboard
+            </p>
+          </div>
         </div>
 
         {/* Google Login Button */}
