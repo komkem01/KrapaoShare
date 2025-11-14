@@ -3,6 +3,8 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useNotifications } from '@/contexts/NotificationContext';
+import NotificationPanel from '@/components/notifications/NotificationPanel';
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
@@ -11,6 +13,17 @@ interface DashboardLayoutProps {
 export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const pathname = usePathname();
+  
+  const {
+    notifications,
+    unreadCount,
+    isNotificationPanelOpen,
+    toggleNotificationPanel,
+    closeNotificationPanel,
+    markAsRead,
+    markAllAsRead,
+    deleteNotification
+  } = useNotifications();
 
   const navigation = [
     { 
@@ -60,6 +73,12 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
       href: '/dashboard/analytics', 
       icon: '📈',
       description: 'กราฟและวิเคราะห์การเงิน'
+    },
+    { 
+      name: 'ตั้งค่า', 
+      href: '/dashboard/settings', 
+      icon: '⚙️',
+      description: 'จัดการข้อมูลส่วนตัวและการตั้งค่า'
     },
   ];
 
@@ -130,9 +149,12 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                 <div className="text-sm font-medium text-gray-900 dark:text-white">ผู้ใช้งาน</div>
                 <div className="text-xs text-gray-500 dark:text-gray-400">user@example.com</div>
               </div>
-              <button className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
+              <Link 
+                href="/dashboard/settings"
+                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+              >
                 <span className="text-lg">⚙️</span>
-              </button>
+              </Link>
             </div>
           </div>
         </div>
@@ -156,9 +178,19 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
             </div>
             
             <div className="flex items-center space-x-4">
-              <button className="text-gray-500 hover:text-gray-600 dark:text-gray-400 dark:hover:text-gray-300">
+              {/* Notification Button */}
+              <button
+                onClick={toggleNotificationPanel}
+                className="relative p-2 text-gray-500 hover:text-gray-600 dark:text-gray-400 dark:hover:text-gray-300 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+              >
                 <span className="text-xl">🔔</span>
+                {unreadCount > 0 && (
+                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-medium min-w-[1.2rem] h-5 rounded-full flex items-center justify-center px-1">
+                    {unreadCount > 99 ? '99+' : unreadCount}
+                  </span>
+                )}
               </button>
+              
               <Link 
                 href="/"
                 className="text-sm text-gray-500 hover:text-gray-600 dark:text-gray-400 dark:hover:text-gray-300"
@@ -174,6 +206,16 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
           {children}
         </main>
       </div>
+
+      {/* Notification Panel */}
+      <NotificationPanel
+        isOpen={isNotificationPanelOpen}
+        onClose={closeNotificationPanel}
+        notifications={notifications}
+        onMarkAsRead={markAsRead}
+        onMarkAllAsRead={markAllAsRead}
+        onDeleteNotification={deleteNotification}
+      />
     </div>
   );
 }
