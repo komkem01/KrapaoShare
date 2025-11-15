@@ -1,32 +1,38 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import DashboardLayout from '@/components/layout/DashboardLayout';
+import { useState } from "react";
+import DashboardLayout from "@/components/layout/DashboardLayout";
+import { useCategories, Category } from "@/contexts/CategoryContext";
 
 export default function SettingsPage() {
-  const [activeTab, setActiveTab] = useState<'profile' | 'security' | 'notifications' | 'preferences'>('profile');
+  const { categories, addCategory, updateCategory, deleteCategory } =
+    useCategories();
+
+  const [activeTab, setActiveTab] = useState<
+    "profile" | "security" | "notifications" | "preferences" | "categories"
+  >("profile");
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [showSuccessMessage, setShowSuccessMessage] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showChangePasswordModal, setShowChangePasswordModal] = useState(false);
   const [passwordData, setPasswordData] = useState({
-    currentPassword: '',
-    newPassword: '',
-    confirmPassword: ''
+    currentPassword: "",
+    newPassword: "",
+    confirmPassword: "",
   });
   const [twoFactorEnabled, setTwoFactorEnabled] = useState(false);
 
   // Mock user data - ในอนาคตจะเชื่อมกับ API
   const [userData, setUserData] = useState({
-    firstName: 'สมชาย',
-    lastName: 'ใจดี',
-    email: 'somchai@example.com',
-    phone: '081-234-5678',
-    birthDate: '1990-05-15',
-    address: '123 ถนนสุขุมวิท กรุงเทพมหานคร',
-    occupation: 'นักพัฒนาซอฟต์แวร์',
-    profileImage: ''
+    firstName: "สมชาย",
+    lastName: "ใจดี",
+    email: "somchai@example.com",
+    phone: "081-234-5678",
+    birthDate: "1990-05-15",
+    address: "123 ถนนสุขุมวิท กรุงเทพมหานคร",
+    occupation: "นักพัฒนาซอฟต์แวร์",
+    profileImage: "",
   });
 
   const [notificationSettings, setNotificationSettings] = useState({
@@ -35,21 +41,67 @@ export default function SettingsPage() {
     budgetAlerts: true,
     goalReminders: true,
     billReminders: true,
-    debtAlerts: true
+    debtAlerts: true,
   });
 
   const [appPreferences, setAppPreferences] = useState({
-    theme: 'auto',
-    language: 'th',
-    currency: 'THB',
-    dateFormat: 'dd/mm/yyyy',
-    startOfWeek: 'monday'
+    theme: "auto",
+    language: "th",
+    currency: "THB",
+    dateFormat: "dd/mm/yyyy",
+    startOfWeek: "monday",
   });
+
+  // Category management states
+  const [categoryModalType, setCategoryModalType] = useState<
+    "income" | "expense" | null
+  >(null);
+  const [editingCategory, setEditingCategory] = useState<Category | null>(null);
+  const [categoryForm, setCategoryForm] = useState({
+    name: "",
+    icon: "💰",
+    color: "#22c55e",
+  });
+
+  const predefinedIcons = [
+    "💰",
+    "💼",
+    "📈",
+    "💵",
+    "🍽️",
+    "🚗",
+    "🛒",
+    "🎬",
+    "🏠",
+    "🏥",
+    "📚",
+    "💳",
+    "🎯",
+    "⚡",
+    "🎁",
+    "🏃‍♂️",
+    "📱",
+    "✈️",
+    "🎵",
+    "👕",
+  ];
+  const predefinedColors = [
+    "#22c55e",
+    "#3b82f6",
+    "#8b5cf6",
+    "#ef4444",
+    "#f59e0b",
+    "#ec4899",
+    "#06b6d4",
+    "#10b981",
+    "#6b7280",
+    "#f97316",
+  ];
 
   const handleSave = async () => {
     setIsSaving(true);
     // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1500));
+    await new Promise((resolve) => setTimeout(resolve, 1500));
     setIsSaving(false);
     setIsEditing(false);
     setShowSuccessMessage(true);
@@ -57,27 +109,35 @@ export default function SettingsPage() {
   };
 
   const handleChangePassword = async () => {
-    if (!passwordData.currentPassword || !passwordData.newPassword || !passwordData.confirmPassword) {
-      alert('กรุณากรอกข้อมูลให้ครบถ้วน');
+    if (
+      !passwordData.currentPassword ||
+      !passwordData.newPassword ||
+      !passwordData.confirmPassword
+    ) {
+      alert("กรุณากรอกข้อมูลให้ครบถ้วน");
       return;
     }
-    
+
     if (passwordData.newPassword !== passwordData.confirmPassword) {
-      alert('รหัสผ่านใหม่ไม่ตรงกัน');
+      alert("รหัสผ่านใหม่ไม่ตรงกัน");
       return;
     }
 
     if (passwordData.newPassword.length < 6) {
-      alert('รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร');
+      alert("รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร");
       return;
     }
 
     setIsSaving(true);
     // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 2000));
+    await new Promise((resolve) => setTimeout(resolve, 2000));
     setIsSaving(false);
     setShowChangePasswordModal(false);
-    setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
+    setPasswordData({
+      currentPassword: "",
+      newPassword: "",
+      confirmPassword: "",
+    });
     setShowSuccessMessage(true);
     setTimeout(() => setShowSuccessMessage(false), 3000);
   };
@@ -85,7 +145,7 @@ export default function SettingsPage() {
   const handleToggleTwoFactor = async () => {
     setIsSaving(true);
     // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1500));
+    await new Promise((resolve) => setTimeout(resolve, 1500));
     setTwoFactorEnabled(!twoFactorEnabled);
     setIsSaving(false);
     setShowSuccessMessage(true);
@@ -98,13 +158,17 @@ export default function SettingsPage() {
       profile: userData,
       notifications: notificationSettings,
       preferences: appPreferences,
-      exportDate: new Date().toISOString()
+      exportDate: new Date().toISOString(),
     };
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const blob = new Blob([JSON.stringify(data, null, 2)], {
+      type: "application/json",
+    });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
+    const a = document.createElement("a");
     a.href = url;
-    a.download = `krapao-share-data-${new Date().toISOString().split('T')[0]}.json`;
+    a.download = `krapao-share-data-${
+      new Date().toISOString().split("T")[0]
+    }.json`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -112,13 +176,17 @@ export default function SettingsPage() {
   };
 
   const handleClearCache = async () => {
-    if (confirm('คุณแน่ใจหรือไม่ที่จะล้างข้อมูลแคช? การกระทำนี้จะลบข้อมูลที่เก็บไว้ชั่วคราว')) {
+    if (
+      confirm(
+        "คุณแน่ใจหรือไม่ที่จะล้างข้อมูลแคช? การกระทำนี้จะลบข้อมูลที่เก็บไว้ชั่วคราว"
+      )
+    ) {
       setIsSaving(true);
       // Simulate cache clearing
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      if ('caches' in window) {
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+      if ("caches" in window) {
         const cacheNames = await caches.keys();
-        await Promise.all(cacheNames.map(name => caches.delete(name)));
+        await Promise.all(cacheNames.map((name) => caches.delete(name)));
       }
       // Clear localStorage
       localStorage.clear();
@@ -135,18 +203,18 @@ export default function SettingsPage() {
   const confirmDeleteAccount = async () => {
     setIsSaving(true);
     // Simulate account deletion
-    await new Promise(resolve => setTimeout(resolve, 2000));
+    await new Promise((resolve) => setTimeout(resolve, 2000));
     setIsSaving(false);
     setShowDeleteModal(false);
-    alert('บัญชีของคุณได้ถูกลบแล้ว');
+    alert("บัญชีของคุณได้ถูกลบแล้ว");
     // In real app, redirect to login or home page
   };
 
   const handleRevokeSession = async (sessionIndex: number) => {
-    if (confirm('คุณแน่ใจหรือไม่ที่จะยกเลิกเซสชันนี้?')) {
+    if (confirm("คุณแน่ใจหรือไม่ที่จะยกเลิกเซสชันนี้?")) {
       setIsSaving(true);
       // Simulate session revocation
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      await new Promise((resolve) => setTimeout(resolve, 1000));
       setIsSaving(false);
       setShowSuccessMessage(true);
       setTimeout(() => setShowSuccessMessage(false), 3000);
@@ -154,15 +222,18 @@ export default function SettingsPage() {
   };
 
   const handleProfileImageUpload = () => {
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = 'image/*';
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = "image/*";
     input.onchange = (e) => {
       const file = (e.target as HTMLInputElement).files?.[0];
       if (file) {
         const reader = new FileReader();
         reader.onload = (e) => {
-          setUserData({ ...userData, profileImage: e.target?.result as string });
+          setUserData({
+            ...userData,
+            profileImage: e.target?.result as string,
+          });
         };
         reader.readAsDataURL(file);
       }
@@ -171,11 +242,103 @@ export default function SettingsPage() {
   };
 
   const tabs = [
-    { id: 'profile', name: 'ข้อมูลส่วนตัว', icon: '👤' },
-    { id: 'security', name: 'ความปลอดภัย', icon: '🔒' },
-    { id: 'notifications', name: 'การแจ้งเตือน', icon: '🔔' },
-    { id: 'preferences', name: 'การตั้งค่า', icon: '⚙️' }
+    { id: "profile", name: "ข้อมูลส่วนตัว", icon: "👤" },
+    { id: "security", name: "ความปลอดภัย", icon: "🔒" },
+    { id: "notifications", name: "การแจ้งเตือน", icon: "🔔" },
+    { id: "preferences", name: "การตั้งค่า", icon: "⚙️" },
+    { id: "categories", name: "หมวดหมู่", icon: "📁" },
   ];
+
+  // Category management functions
+  const handleAddCategory = (type: "income" | "expense") => {
+    setCategoryModalType(type);
+    setEditingCategory(null);
+    setCategoryForm({
+      name: "",
+      icon: type === "income" ? "💰" : "💳",
+      color: type === "income" ? "#22c55e" : "#ef4444",
+    });
+  };
+
+  const handleResetCategories = async () => {
+    const confirmMessage = `ต้องการรีเซ็ตหมวดหมู่กลับไปเป็นค่าเริ่มต้นหรือไม่?\n\n⚠️ หมวดหมู่ที่สร้างเองทั้งหมดจะถูกลบ และจะกลับมาเป็นหมวดหมู่เริ่มต้นเท่านั้น`;
+    
+    if (!confirm(confirmMessage)) return;
+
+    setIsSaving(true);
+    await new Promise(resolve => setTimeout(resolve, 1000));
+
+    // สร้างหมวดหมู่เริ่มต้นใหม่ผ่าน Context
+    // ในการใช้งานจริงจะเรียก API เพื่อ reset ข้อมูล
+    
+    setIsSaving(false);
+    setShowSuccessMessage(true);
+    setTimeout(() => setShowSuccessMessage(false), 3000);
+    
+    alert('รีเซ็ตหมวดหมู่สำเร็จ! 🎉\nหมวดหมู่ได้กลับมาเป็นค่าเริ่มต้นแล้ว');
+  };
+
+  const handleEditCategory = (
+    category: Category,
+    type: "income" | "expense"
+  ) => {
+    setCategoryModalType(type);
+    setEditingCategory(category);
+    setCategoryForm({
+      name: category.name,
+      icon: category.icon,
+      color: category.color,
+    });
+  };
+
+  const handleSaveCategory = async () => {
+    if (!categoryForm.name.trim() || !categoryModalType) return;
+
+    setIsSaving(true);
+    await new Promise((resolve) => setTimeout(resolve, 800));
+
+    if (editingCategory) {
+      // Edit existing category
+      updateCategory(categoryModalType, editingCategory.id, categoryForm);
+    } else {
+      // Add new category
+      addCategory(categoryModalType, categoryForm);
+    }
+
+    setIsSaving(false);
+    setCategoryModalType(null);
+    setEditingCategory(null);
+    setCategoryForm({ name: "", icon: "💰", color: "#22c55e" });
+    setShowSuccessMessage(true);
+    setTimeout(() => setShowSuccessMessage(false), 3000);
+  };
+
+  const handleDeleteCategory = async (
+    categoryId: number,
+    type: "income" | "expense"
+  ) => {
+    const category = categories[type].find(cat => cat.id === categoryId);
+    if (!category) return;
+
+    // ป้องกันการลบหมวดหมู่สุดท้าย
+    if (categories[type].length === 1) {
+      alert(`ไม่สามารถลบหมวดหมู่${type === 'income' ? 'รายรับ' : 'รายจ่าย'}สุดท้ายได้ กรุณาเพิ่มหมวดหมู่ใหม่ก่อน`);
+      return;
+    }
+
+    const confirmMessage = `ต้องการลบหมวดหมู่ "${category.name}" หรือไม่?\n\n⚠️ หมวดหมู่ที่ถูกลบจะไม่สามารถกู้คืนได้ และรายการที่ใช้หมวดหมู่นี้จะต้องจัดหมวดหมู่ใหม่`;
+    
+    if (!confirm(confirmMessage)) return;
+
+    setIsSaving(true);
+    await new Promise((resolve) => setTimeout(resolve, 500));
+
+    deleteCategory(type, categoryId);
+
+    setIsSaving(false);
+    setShowSuccessMessage(true);
+    setTimeout(() => setShowSuccessMessage(false), 3000);
+  };
 
   return (
     <DashboardLayout>
@@ -201,8 +364,8 @@ export default function SettingsPage() {
                     onClick={() => setActiveTab(tab.id as any)}
                     className={`w-full flex items-center space-x-3 px-3 py-2 rounded-lg text-sm font-light transition-colors ${
                       activeTab === tab.id
-                        ? 'bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white'
-                        : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-white'
+                        ? "bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white"
+                        : "text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-white"
                     }`}
                   >
                     <span className="text-lg">{tab.icon}</span>
@@ -216,17 +379,16 @@ export default function SettingsPage() {
           {/* Main Content */}
           <div className="lg:col-span-3">
             <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
-              
               {/* Success Message */}
-      {showSuccessMessage && (
-        <div className="fixed top-4 right-4 z-50 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg flex items-center space-x-2 animate-slide-in">
-          <span className="text-lg">✅</span>
-          <span className="font-medium">บันทึกข้อมูลสำเร็จ!</span>
-        </div>
-      )}
+              {showSuccessMessage && (
+                <div className="fixed top-4 right-4 z-50 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg flex items-center space-x-2 animate-slide-in">
+                  <span className="text-lg">✅</span>
+                  <span className="font-medium">บันทึกข้อมูลสำเร็จ!</span>
+                </div>
+              )}
 
-      {/* Profile Tab */}
-              {activeTab === 'profile' && (
+              {/* Profile Tab */}
+              {activeTab === "profile" && (
                 <div className="p-6">
                   <div className="flex items-center justify-between mb-6">
                     <div>
@@ -251,7 +413,7 @@ export default function SettingsPage() {
                             disabled={isSaving}
                             className="px-4 py-2 text-sm font-light bg-gray-900 dark:bg-white text-white dark:text-gray-900 rounded-lg hover:bg-gray-800 dark:hover:bg-gray-100 transition-colors disabled:opacity-50"
                           >
-                            {isSaving ? 'กำลังบันทึก...' : 'บันทึก'}
+                            {isSaving ? "กำลังบันทึก..." : "บันทึก"}
                           </button>
                         </>
                       ) : (
@@ -270,19 +432,20 @@ export default function SettingsPage() {
                     <div className="relative">
                       <div className="w-20 h-20 bg-gray-200 dark:bg-gray-700 rounded-full flex items-center justify-center">
                         {userData.profileImage ? (
-                          <img 
-                            src={userData.profileImage} 
-                            alt="Profile" 
+                          <img
+                            src={userData.profileImage}
+                            alt="Profile"
                             className="w-20 h-20 rounded-full object-cover"
                           />
                         ) : (
                           <span className="text-2xl text-gray-500 dark:text-gray-400">
-                            {userData.firstName.charAt(0)}{userData.lastName.charAt(0)}
+                            {userData.firstName.charAt(0)}
+                            {userData.lastName.charAt(0)}
                           </span>
                         )}
                       </div>
                       {isEditing && (
-                        <button 
+                        <button
                           onClick={handleProfileImageUpload}
                           className="absolute -bottom-1 -right-1 w-7 h-7 bg-gray-900 dark:bg-white text-white dark:text-gray-900 rounded-full flex items-center justify-center text-xs hover:bg-gray-800 dark:hover:bg-gray-100 transition-colors"
                           title="เปลี่ยนรูปโปรไฟล์"
@@ -310,12 +473,17 @@ export default function SettingsPage() {
                       <input
                         type="text"
                         value={userData.firstName}
-                        onChange={(e) => setUserData({...userData, firstName: e.target.value})}
+                        onChange={(e) =>
+                          setUserData({
+                            ...userData,
+                            firstName: e.target.value,
+                          })
+                        }
                         disabled={!isEditing}
                         className="w-full px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white font-light disabled:bg-gray-50 dark:disabled:bg-gray-700 disabled:text-gray-500 dark:disabled:text-gray-400 focus:ring-2 focus:ring-gray-200 dark:focus:ring-gray-600 focus:border-transparent transition-colors"
                       />
                     </div>
-                    
+
                     <div>
                       <label className="block text-sm font-light text-gray-700 dark:text-gray-300 mb-2">
                         นามสกุล
@@ -323,7 +491,9 @@ export default function SettingsPage() {
                       <input
                         type="text"
                         value={userData.lastName}
-                        onChange={(e) => setUserData({...userData, lastName: e.target.value})}
+                        onChange={(e) =>
+                          setUserData({ ...userData, lastName: e.target.value })
+                        }
                         disabled={!isEditing}
                         className="w-full px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white font-light disabled:bg-gray-50 dark:disabled:bg-gray-700 disabled:text-gray-500 dark:disabled:text-gray-400 focus:ring-2 focus:ring-gray-200 dark:focus:ring-gray-600 focus:border-transparent transition-colors"
                       />
@@ -336,7 +506,9 @@ export default function SettingsPage() {
                       <input
                         type="email"
                         value={userData.email}
-                        onChange={(e) => setUserData({...userData, email: e.target.value})}
+                        onChange={(e) =>
+                          setUserData({ ...userData, email: e.target.value })
+                        }
                         disabled={!isEditing}
                         className="w-full px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white font-light disabled:bg-gray-50 dark:disabled:bg-gray-700 disabled:text-gray-500 dark:disabled:text-gray-400 focus:ring-2 focus:ring-gray-200 dark:focus:ring-gray-600 focus:border-transparent transition-colors"
                       />
@@ -349,7 +521,9 @@ export default function SettingsPage() {
                       <input
                         type="tel"
                         value={userData.phone}
-                        onChange={(e) => setUserData({...userData, phone: e.target.value})}
+                        onChange={(e) =>
+                          setUserData({ ...userData, phone: e.target.value })
+                        }
                         disabled={!isEditing}
                         className="w-full px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white font-light disabled:bg-gray-50 dark:disabled:bg-gray-700 disabled:text-gray-500 dark:disabled:text-gray-400 focus:ring-2 focus:ring-gray-200 dark:focus:ring-gray-600 focus:border-transparent transition-colors"
                       />
@@ -362,7 +536,12 @@ export default function SettingsPage() {
                       <input
                         type="date"
                         value={userData.birthDate}
-                        onChange={(e) => setUserData({...userData, birthDate: e.target.value})}
+                        onChange={(e) =>
+                          setUserData({
+                            ...userData,
+                            birthDate: e.target.value,
+                          })
+                        }
                         disabled={!isEditing}
                         className="w-full px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white font-light disabled:bg-gray-50 dark:disabled:bg-gray-700 disabled:text-gray-500 dark:disabled:text-gray-400 focus:ring-2 focus:ring-gray-200 dark:focus:ring-gray-600 focus:border-transparent transition-colors"
                       />
@@ -375,7 +554,12 @@ export default function SettingsPage() {
                       <input
                         type="text"
                         value={userData.occupation}
-                        onChange={(e) => setUserData({...userData, occupation: e.target.value})}
+                        onChange={(e) =>
+                          setUserData({
+                            ...userData,
+                            occupation: e.target.value,
+                          })
+                        }
                         disabled={!isEditing}
                         className="w-full px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white font-light disabled:bg-gray-50 dark:disabled:bg-gray-700 disabled:text-gray-500 dark:disabled:text-gray-400 focus:ring-2 focus:ring-gray-200 dark:focus:ring-gray-600 focus:border-transparent transition-colors"
                       />
@@ -387,7 +571,9 @@ export default function SettingsPage() {
                       </label>
                       <textarea
                         value={userData.address}
-                        onChange={(e) => setUserData({...userData, address: e.target.value})}
+                        onChange={(e) =>
+                          setUserData({ ...userData, address: e.target.value })
+                        }
                         disabled={!isEditing}
                         rows={3}
                         className="w-full px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white font-light disabled:bg-gray-50 dark:disabled:bg-gray-700 disabled:text-gray-500 dark:disabled:text-gray-400 focus:ring-2 focus:ring-gray-200 dark:focus:ring-gray-600 focus:border-transparent transition-colors resize-none"
@@ -398,7 +584,7 @@ export default function SettingsPage() {
               )}
 
               {/* Security Tab */}
-              {activeTab === 'security' && (
+              {activeTab === "security" && (
                 <div className="p-6">
                   <div className="mb-6">
                     <h2 className="text-lg font-light text-gray-900 dark:text-white">
@@ -443,7 +629,7 @@ export default function SettingsPage() {
                             className="w-full px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white font-light focus:ring-2 focus:ring-gray-200 dark:focus:ring-gray-600 focus:border-transparent transition-colors"
                           />
                         </div>
-                        <button 
+                        <button
                           onClick={() => setShowChangePasswordModal(true)}
                           className="px-4 py-2 text-sm font-light bg-gray-900 dark:bg-white text-white dark:text-gray-900 rounded-lg hover:bg-gray-800 dark:hover:bg-gray-100 transition-colors"
                         >
@@ -463,16 +649,20 @@ export default function SettingsPage() {
                             เพิ่มความปลอดภัยให้กับบัญชีของคุณ
                           </p>
                         </div>
-                        <button 
+                        <button
                           onClick={handleToggleTwoFactor}
                           disabled={isSaving}
                           className={`px-4 py-2 text-sm font-light border rounded-lg transition-colors ${
-                            twoFactorEnabled 
-                              ? 'border-red-200 dark:border-red-700 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20' 
-                              : 'border-green-200 dark:border-green-700 text-green-600 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/20'
+                            twoFactorEnabled
+                              ? "border-red-200 dark:border-red-700 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20"
+                              : "border-green-200 dark:border-green-700 text-green-600 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/20"
                           } disabled:opacity-50`}
                         >
-                          {isSaving ? 'กำลังประมวลผล...' : twoFactorEnabled ? 'ปิดใช้งาน' : 'เปิดใช้งาน'}
+                          {isSaving
+                            ? "กำลังประมวลผล..."
+                            : twoFactorEnabled
+                            ? "ปิดใช้งาน"
+                            : "เปิดใช้งาน"}
                         </button>
                       </div>
                     </div>
@@ -484,11 +674,29 @@ export default function SettingsPage() {
                       </h3>
                       <div className="space-y-3">
                         {[
-                          { device: 'Chrome บน Windows', location: 'กรุงเทพฯ, ไทย', time: '14 พ.ย. 2025, 14:30', current: true },
-                          { device: 'Safari บน iPhone', location: 'กรุงเทพฯ, ไทย', time: '13 พ.ย. 2025, 09:15', current: false },
-                          { device: 'Chrome บน Mac', location: 'กรุงเทพฯ, ไทย', time: '12 พ.ย. 2025, 18:45', current: false }
+                          {
+                            device: "Chrome บน Windows",
+                            location: "กรุงเทพฯ, ไทย",
+                            time: "14 พ.ย. 2025, 14:30",
+                            current: true,
+                          },
+                          {
+                            device: "Safari บน iPhone",
+                            location: "กรุงเทพฯ, ไทย",
+                            time: "13 พ.ย. 2025, 09:15",
+                            current: false,
+                          },
+                          {
+                            device: "Chrome บน Mac",
+                            location: "กรุงเทพฯ, ไทย",
+                            time: "12 พ.ย. 2025, 18:45",
+                            current: false,
+                          },
                         ].map((session, index) => (
-                          <div key={index} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                          <div
+                            key={index}
+                            className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg"
+                          >
                             <div>
                               <p className="text-sm font-light text-gray-900 dark:text-white">
                                 {session.device}
@@ -503,12 +711,12 @@ export default function SettingsPage() {
                               </p>
                             </div>
                             {!session.current && (
-                              <button 
+                              <button
                                 onClick={() => handleRevokeSession(index)}
                                 disabled={isSaving}
                                 className="text-xs text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 font-light disabled:opacity-50"
                               >
-                                {isSaving ? 'กำลังยกเลิก...' : 'ยกเลิก'}
+                                {isSaving ? "กำลังยกเลิก..." : "ยกเลิก"}
                               </button>
                             )}
                           </div>
@@ -520,7 +728,7 @@ export default function SettingsPage() {
               )}
 
               {/* Notifications Tab */}
-              {activeTab === 'notifications' && (
+              {activeTab === "notifications" && (
                 <div className="p-6">
                   <div className="mb-6">
                     <h2 className="text-lg font-light text-gray-900 dark:text-white">
@@ -533,14 +741,41 @@ export default function SettingsPage() {
 
                   <div className="space-y-6">
                     {[
-                      { key: 'emailNotifications', title: 'การแจ้งเตือนทางอีเมล', description: 'รับการแจ้งเตือนผ่านอีเมล' },
-                      { key: 'pushNotifications', title: 'การแจ้งเตือนแบบ Push', description: 'รับการแจ้งเตือนบนอุปกรณ์' },
-                      { key: 'budgetAlerts', title: 'แจ้งเตือนงบประมาณ', description: 'แจ้งเตือนเมื่องบประมาณใกล้หมด' },
-                      { key: 'goalReminders', title: 'แจ้งเตือนเป้าหมาย', description: 'แจ้งเตือนความคืบหน้าเป้าหมาย' },
-                      { key: 'billReminders', title: 'แจ้งเตือนบิล', description: 'แจ้งเตือนการชำระบิลที่ค้างชำระ' },
-                      { key: 'debtAlerts', title: 'แจ้งเตือนหนี้สิน', description: 'แจ้งเตือนหนี้สินที่เกินกำหนด' }
+                      {
+                        key: "emailNotifications",
+                        title: "การแจ้งเตือนทางอีเมล",
+                        description: "รับการแจ้งเตือนผ่านอีเมล",
+                      },
+                      {
+                        key: "pushNotifications",
+                        title: "การแจ้งเตือนแบบ Push",
+                        description: "รับการแจ้งเตือนบนอุปกรณ์",
+                      },
+                      {
+                        key: "budgetAlerts",
+                        title: "แจ้งเตือนงบประมาณ",
+                        description: "แจ้งเตือนเมื่องบประมาณใกล้หมด",
+                      },
+                      {
+                        key: "goalReminders",
+                        title: "แจ้งเตือนเป้าหมาย",
+                        description: "แจ้งเตือนความคืบหน้าเป้าหมาย",
+                      },
+                      {
+                        key: "billReminders",
+                        title: "แจ้งเตือนบิล",
+                        description: "แจ้งเตือนการชำระบิลที่ค้างชำระ",
+                      },
+                      {
+                        key: "debtAlerts",
+                        title: "แจ้งเตือนหนี้สิน",
+                        description: "แจ้งเตือนหนี้สินที่เกินกำหนด",
+                      },
                     ].map((setting) => (
-                      <div key={setting.key} className="flex items-center justify-between p-4 border border-gray-200 dark:border-gray-700 rounded-lg">
+                      <div
+                        key={setting.key}
+                        className="flex items-center justify-between p-4 border border-gray-200 dark:border-gray-700 rounded-lg"
+                      >
                         <div>
                           <h3 className="text-sm font-light text-gray-900 dark:text-white">
                             {setting.title}
@@ -552,11 +787,17 @@ export default function SettingsPage() {
                         <label className="relative inline-flex items-center cursor-pointer">
                           <input
                             type="checkbox"
-                            checked={notificationSettings[setting.key as keyof typeof notificationSettings]}
-                            onChange={(e) => setNotificationSettings({
-                              ...notificationSettings,
-                              [setting.key]: e.target.checked
-                            })}
+                            checked={
+                              notificationSettings[
+                                setting.key as keyof typeof notificationSettings
+                              ]
+                            }
+                            onChange={(e) =>
+                              setNotificationSettings({
+                                ...notificationSettings,
+                                [setting.key]: e.target.checked,
+                              })
+                            }
                             className="sr-only peer"
                           />
                           <div className="w-11 h-6 bg-gray-200 dark:bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-gray-900 dark:peer-checked:bg-white"></div>
@@ -567,8 +808,258 @@ export default function SettingsPage() {
                 </div>
               )}
 
+              {/* Categories Tab */}
+              {activeTab === "categories" && (
+                <div className="p-6">
+                  <div className="mb-6">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h2 className="text-lg font-light text-gray-900 dark:text-white">
+                          จัดการหมวดหมู่
+                        </h2>
+                        <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                          กำหนดและจัดการหมวดหมู่สำหรับรายรับและรายจ่าย
+                        </p>
+                      </div>
+                      <div className="flex space-x-2">
+                        <button
+                          onClick={handleResetCategories}
+                          disabled={isSaving}
+                          className="px-3 py-1.5 text-sm font-light border border-orange-200 dark:border-orange-700 text-orange-600 dark:text-orange-400 rounded-lg hover:bg-orange-50 dark:hover:bg-orange-900/20 transition-colors disabled:opacity-50 flex items-center space-x-1"
+                          title="รีเซ็ตหมวดหมู่กลับเป็นค่าเริ่มต้น"
+                        >
+                          <span>🔄</span>
+                          <span className="hidden sm:inline">รีเซ็ต</span>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Summary Stats */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+                    <div className="bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 border border-green-200 dark:border-green-700 rounded-lg p-4">
+                      <div className="flex items-center space-x-3">
+                        <div className="w-10 h-10 bg-green-500 rounded-lg flex items-center justify-center">
+                          <span className="text-white text-lg">📈</span>
+                        </div>
+                        <div>
+                          <p className="text-sm text-green-600 dark:text-green-400 font-medium">หมวดหมู่รายรับ</p>
+                          <p className="text-2xl font-light text-green-700 dark:text-green-300">{categories.income.length}</p>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="bg-gradient-to-r from-red-50 to-rose-50 dark:from-red-900/20 dark:to-rose-900/20 border border-red-200 dark:border-red-700 rounded-lg p-4">
+                      <div className="flex items-center space-x-3">
+                        <div className="w-10 h-10 bg-red-500 rounded-lg flex items-center justify-center">
+                          <span className="text-white text-lg">📉</span>
+                        </div>
+                        <div>
+                          <p className="text-sm text-red-600 dark:text-red-400 font-medium">หมวดหมู่รายจ่าย</p>
+                          <p className="text-2xl font-light text-red-700 dark:text-red-300">{categories.expense.length}</p>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 border border-blue-200 dark:border-blue-700 rounded-lg p-4">
+                      <div className="flex items-center space-x-3">
+                        <div className="w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center">
+                          <span className="text-white text-lg">📊</span>
+                        </div>
+                        <div>
+                          <p className="text-sm text-blue-600 dark:text-blue-400 font-medium">รวมทั้งหมด</p>
+                          <p className="text-2xl font-light text-blue-700 dark:text-blue-300">{categories.income.length + categories.expense.length}</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-8">
+                    {/* Income Categories */}
+                    <div>
+                      <div className="flex items-center justify-between mb-4">
+                        <h3 className="text-base font-light text-gray-900 dark:text-white flex items-center space-x-2">
+                          <span className="text-green-500">📈</span>
+                          <span>หมวดหมู่รายรับ</span>
+                          <span className="text-xs bg-green-100 dark:bg-green-900 text-green-600 dark:text-green-400 px-2 py-1 rounded-full">
+                            {categories.income.length}
+                          </span>
+                        </h3>
+                        <button
+                          onClick={() => handleAddCategory("income")}
+                          className="px-3 py-1.5 text-sm font-light bg-green-500 hover:bg-green-600 text-white rounded-lg transition-colors flex items-center space-x-1"
+                        >
+                          <span>+</span>
+                          <span>เพิ่ม</span>
+                        </button>
+                      </div>
+                      {categories.income.length === 0 ? (
+                        <div className="col-span-full text-center py-8 px-4 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg">
+                          <div className="text-gray-400 dark:text-gray-500 mb-2">
+                            <span className="text-4xl">📈</span>
+                          </div>
+                          <p className="text-gray-600 dark:text-gray-400 mb-2">
+                            ยังไม่มีหมวดหมู่รายรับ
+                          </p>
+                          <p className="text-sm text-gray-500 dark:text-gray-500">
+                            คลิก "เพิ่ม" เพื่อสร้างหมวดหมู่แรกของคุณ
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                          {categories.income.map((category) => (
+                            <div
+                              key={category.id}
+                              className="group p-3 border border-gray-200 dark:border-gray-700 rounded-lg hover:border-green-300 dark:hover:border-green-600 transition-colors relative hover:shadow-md"
+                            >
+                              <div className="flex items-center space-x-2 mb-2">
+                                <span
+                                  className="text-lg"
+                                  style={{
+                                    filter: `hue-rotate(${
+                                      category.color === "#22c55e"
+                                        ? "0deg"
+                                        : "180deg"
+                                    })`,
+                                  }}
+                                >
+                                  {category.icon}
+                                </span>
+                                <span className="text-sm font-light text-gray-900 dark:text-white truncate">
+                                  {category.name}
+                                </span>
+                              </div>
+                              <div
+                                className="w-full h-1 rounded-full mb-2"
+                                style={{ backgroundColor: category.color }}
+                              ></div>
+
+                              {/* Action Buttons - Always visible */}
+                              <div className="flex justify-end space-x-2 mt-2">
+                                <button
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    handleEditCategory(category, "income");
+                                  }}
+                                  className="px-3 py-1.5 bg-blue-500 hover:bg-blue-600 text-white rounded-lg text-xs flex items-center space-x-1 transition-all duration-200 hover:scale-105 shadow-md"
+                                  title="แก้ไขหมวดหมู่"
+                                >
+                                  <span>✏️</span>
+                                  <span className="hidden sm:inline">
+                                    แก้ไข
+                                  </span>
+                                </button>
+                                <button
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    handleDeleteCategory(category.id, "income");
+                                  }}
+                                  className="px-3 py-1.5 bg-red-500 hover:bg-red-600 text-white rounded-lg text-xs flex items-center space-x-1 transition-all duration-200 hover:scale-105 shadow-md"
+                                  title="ลบหมวดหมู่"
+                                >
+                                  <span>🗑️</span>
+                                  <span className="hidden sm:inline">ลบ</span>
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Expense Categories */}
+                    <div>
+                      <div className="flex items-center justify-between mb-4">
+                        <h3 className="text-base font-light text-gray-900 dark:text-white flex items-center space-x-2">
+                          <span className="text-red-500">📉</span>
+                          <span>หมวดหมู่รายจ่าย</span>
+                          <span className="text-xs bg-red-100 dark:bg-red-900 text-red-600 dark:text-red-400 px-2 py-1 rounded-full">
+                            {categories.expense.length}
+                          </span>
+                        </h3>
+                        <button
+                          onClick={() => handleAddCategory("expense")}
+                          className="px-3 py-1.5 text-sm font-light bg-red-500 hover:bg-red-600 text-white rounded-lg transition-colors flex items-center space-x-1"
+                        >
+                          <span>+</span>
+                          <span>เพิ่ม</span>
+                        </button>
+                      </div>
+                      {categories.expense.length === 0 ? (
+                        <div className="col-span-full text-center py-8 px-4 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg">
+                          <div className="text-gray-400 dark:text-gray-500 mb-2">
+                            <span className="text-4xl">📉</span>
+                          </div>
+                          <p className="text-gray-600 dark:text-gray-400 mb-2">
+                            ยังไม่มีหมวดหมู่รายจ่าย
+                          </p>
+                          <p className="text-sm text-gray-500 dark:text-gray-500">
+                            คลิก "เพิ่ม" เพื่อสร้างหมวดหมู่แรกของคุณ
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                          {categories.expense.map((category) => (
+                            <div
+                              key={category.id}
+                              className="group p-3 border border-gray-200 dark:border-gray-700 rounded-lg hover:border-red-300 dark:hover:border-red-600 transition-colors relative hover:shadow-md"
+                            >
+                              <div className="flex items-center space-x-2 mb-2">
+                                <span className="text-lg">{category.icon}</span>
+                                <span className="text-sm font-light text-gray-900 dark:text-white truncate">
+                                  {category.name}
+                                </span>
+                              </div>
+                              <div
+                                className="w-full h-1 rounded-full mb-2"
+                                style={{ backgroundColor: category.color }}
+                              ></div>
+
+                              {/* Action Buttons - Always visible */}
+                              <div className="flex justify-end space-x-2 mt-2">
+                                <button
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    handleEditCategory(category, "expense");
+                                  }}
+                                  className="px-3 py-1.5 bg-blue-500 hover:bg-blue-600 text-white rounded-lg text-xs flex items-center space-x-1 transition-all duration-200 hover:scale-105 shadow-md"
+                                  title="แก้ไขหมวดหมู่"
+                                >
+                                  <span>✏️</span>
+                                  <span className="hidden sm:inline">
+                                    แก้ไข
+                                  </span>
+                                </button>
+                                <button
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    handleDeleteCategory(
+                                      category.id,
+                                      "expense"
+                                    );
+                                  }}
+                                  className="px-3 py-1.5 bg-red-500 hover:bg-red-600 text-white rounded-lg text-xs flex items-center space-x-1 transition-all duration-200 hover:scale-105 shadow-md"
+                                  title="ลบหมวดหมู่"
+                                >
+                                  <span>🗑️</span>
+                                  <span className="hidden sm:inline">ลบ</span>
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Preferences Tab */}
-              {activeTab === 'preferences' && (
+              {activeTab === "preferences" && (
                 <div className="p-6">
                   <div className="mb-6">
                     <h2 className="text-lg font-light text-gray-900 dark:text-white">
@@ -587,7 +1078,12 @@ export default function SettingsPage() {
                         </label>
                         <select
                           value={appPreferences.theme}
-                          onChange={(e) => setAppPreferences({...appPreferences, theme: e.target.value})}
+                          onChange={(e) =>
+                            setAppPreferences({
+                              ...appPreferences,
+                              theme: e.target.value,
+                            })
+                          }
                           className="w-full px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white font-light focus:ring-2 focus:ring-gray-200 dark:focus:ring-gray-600 focus:border-transparent transition-colors"
                         >
                           <option value="auto">อัตโนมัติ</option>
@@ -602,7 +1098,12 @@ export default function SettingsPage() {
                         </label>
                         <select
                           value={appPreferences.language}
-                          onChange={(e) => setAppPreferences({...appPreferences, language: e.target.value})}
+                          onChange={(e) =>
+                            setAppPreferences({
+                              ...appPreferences,
+                              language: e.target.value,
+                            })
+                          }
                           className="w-full px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white font-light focus:ring-2 focus:ring-gray-200 dark:focus:ring-gray-600 focus:border-transparent transition-colors"
                         >
                           <option value="th">ไทย</option>
@@ -616,7 +1117,12 @@ export default function SettingsPage() {
                         </label>
                         <select
                           value={appPreferences.currency}
-                          onChange={(e) => setAppPreferences({...appPreferences, currency: e.target.value})}
+                          onChange={(e) =>
+                            setAppPreferences({
+                              ...appPreferences,
+                              currency: e.target.value,
+                            })
+                          }
                           className="w-full px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white font-light focus:ring-2 focus:ring-gray-200 dark:focus:ring-gray-600 focus:border-transparent transition-colors"
                         >
                           <option value="THB">บาท (฿)</option>
@@ -631,7 +1137,12 @@ export default function SettingsPage() {
                         </label>
                         <select
                           value={appPreferences.dateFormat}
-                          onChange={(e) => setAppPreferences({...appPreferences, dateFormat: e.target.value})}
+                          onChange={(e) =>
+                            setAppPreferences({
+                              ...appPreferences,
+                              dateFormat: e.target.value,
+                            })
+                          }
                           className="w-full px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white font-light focus:ring-2 focus:ring-gray-200 dark:focus:ring-gray-600 focus:border-transparent transition-colors"
                         >
                           <option value="dd/mm/yyyy">DD/MM/YYYY</option>
@@ -646,7 +1157,12 @@ export default function SettingsPage() {
                         </label>
                         <select
                           value={appPreferences.startOfWeek}
-                          onChange={(e) => setAppPreferences({...appPreferences, startOfWeek: e.target.value})}
+                          onChange={(e) =>
+                            setAppPreferences({
+                              ...appPreferences,
+                              startOfWeek: e.target.value,
+                            })
+                          }
                           className="w-full px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white font-light focus:ring-2 focus:ring-gray-200 dark:focus:ring-gray-600 focus:border-transparent transition-colors"
                         >
                           <option value="sunday">วันอาทิตย์</option>
@@ -661,25 +1177,25 @@ export default function SettingsPage() {
                         การจัดการข้อมูล
                       </h3>
                       <div className="space-y-3">
-                      <button 
-                        onClick={handleExportData}
-                        className="w-full px-4 py-2 text-sm font-light border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors text-left"
-                      >
-                        📤 ส่งออกข้อมูล
-                      </button>
-                      <button 
-                        onClick={handleClearCache}
-                        disabled={isSaving}
-                        className="w-full px-4 py-2 text-sm font-light border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors text-left disabled:opacity-50"
-                      >
-                        🗑️ {isSaving ? 'กำลังล้าง...' : 'ล้างข้อมูลแคช'}
-                      </button>
-                      <button 
-                        onClick={handleDeleteAccount}
-                        className="w-full px-4 py-2 text-sm font-light border border-red-200 dark:border-red-700 text-red-600 dark:text-red-400 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors text-left"
-                      >
-                        ⚠️ ลบบัญชี
-                      </button>
+                        <button
+                          onClick={handleExportData}
+                          className="w-full px-4 py-2 text-sm font-light border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors text-left"
+                        >
+                          📤 ส่งออกข้อมูล
+                        </button>
+                        <button
+                          onClick={handleClearCache}
+                          disabled={isSaving}
+                          className="w-full px-4 py-2 text-sm font-light border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors text-left disabled:opacity-50"
+                        >
+                          🗑️ {isSaving ? "กำลังล้าง..." : "ล้างข้อมูลแคช"}
+                        </button>
+                        <button
+                          onClick={handleDeleteAccount}
+                          className="w-full px-4 py-2 text-sm font-light border border-red-200 dark:border-red-700 text-red-600 dark:text-red-400 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors text-left"
+                        >
+                          ⚠️ ลบบัญชี
+                        </button>
                       </div>
                     </div>
                   </div>
@@ -693,8 +1209,8 @@ export default function SettingsPage() {
         {showChangePasswordModal && (
           <div className="fixed inset-0 z-50 overflow-y-auto">
             <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
-              <div 
-                className="fixed inset-0 transition-opacity backdrop-blur-sm" 
+              <div
+                className="fixed inset-0 transition-opacity backdrop-blur-sm"
                 onClick={() => setShowChangePasswordModal(false)}
               >
                 <div className="absolute inset-0 bg-gray-900/80 dark:bg-black/80"></div>
@@ -731,7 +1247,12 @@ export default function SettingsPage() {
                       <input
                         type="password"
                         value={passwordData.currentPassword}
-                        onChange={(e) => setPasswordData({...passwordData, currentPassword: e.target.value})}
+                        onChange={(e) =>
+                          setPasswordData({
+                            ...passwordData,
+                            currentPassword: e.target.value,
+                          })
+                        }
                         className="w-full px-4 py-3 border border-gray-200 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 dark:bg-gray-700 dark:text-white"
                         placeholder="กรอกรหัสผ่านปัจจุบัน"
                       />
@@ -743,7 +1264,12 @@ export default function SettingsPage() {
                       <input
                         type="password"
                         value={passwordData.newPassword}
-                        onChange={(e) => setPasswordData({...passwordData, newPassword: e.target.value})}
+                        onChange={(e) =>
+                          setPasswordData({
+                            ...passwordData,
+                            newPassword: e.target.value,
+                          })
+                        }
                         className="w-full px-4 py-3 border border-gray-200 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 dark:bg-gray-700 dark:text-white"
                         placeholder="กรอกรหัสผ่านใหม่"
                       />
@@ -755,7 +1281,12 @@ export default function SettingsPage() {
                       <input
                         type="password"
                         value={passwordData.confirmPassword}
-                        onChange={(e) => setPasswordData({...passwordData, confirmPassword: e.target.value})}
+                        onChange={(e) =>
+                          setPasswordData({
+                            ...passwordData,
+                            confirmPassword: e.target.value,
+                          })
+                        }
                         className="w-full px-4 py-3 border border-gray-200 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 dark:bg-gray-700 dark:text-white"
                         placeholder="ยืนยันรหัสผ่านใหม่"
                       />
@@ -776,7 +1307,7 @@ export default function SettingsPage() {
                       disabled={isSaving}
                       className="flex-1 px-6 py-3 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 disabled:from-gray-400 disabled:to-gray-500 text-white rounded-xl transition-all duration-200 font-medium disabled:cursor-not-allowed"
                     >
-                      {isSaving ? 'กำลังเปลี่ยน...' : 'เปลี่ยนรหัสผ่าน'}
+                      {isSaving ? "กำลังเปลี่ยน..." : "เปลี่ยนรหัสผ่าน"}
                     </button>
                   </div>
                 </div>
@@ -789,8 +1320,8 @@ export default function SettingsPage() {
         {showDeleteModal && (
           <div className="fixed inset-0 z-50 overflow-y-auto">
             <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
-              <div 
-                className="fixed inset-0 transition-opacity backdrop-blur-sm" 
+              <div
+                className="fixed inset-0 transition-opacity backdrop-blur-sm"
                 onClick={() => setShowDeleteModal(false)}
               >
                 <div className="absolute inset-0 bg-gray-900/80 dark:bg-black/80"></div>
@@ -805,9 +1336,7 @@ export default function SettingsPage() {
                       <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
                         <span className="text-white text-xl">⚠️</span>
                       </div>
-                      <h3 className="text-xl font-bold text-white">
-                        ลบบัญชี
-                      </h3>
+                      <h3 className="text-xl font-bold text-white">ลบบัญชี</h3>
                     </div>
                     <button
                       onClick={() => setShowDeleteModal(false)}
@@ -821,20 +1350,25 @@ export default function SettingsPage() {
                 <div className="bg-white dark:bg-gray-800 px-6 py-6">
                   <div className="text-center">
                     <div className="w-16 h-16 bg-red-100 dark:bg-red-900 rounded-full flex items-center justify-center mx-auto mb-4">
-                      <span className="text-red-600 dark:text-red-400 text-2xl">⚠️</span>
+                      <span className="text-red-600 dark:text-red-400 text-2xl">
+                        ⚠️
+                      </span>
                     </div>
                     <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
                       คุณแน่ใจหรือไม่?
                     </h4>
                     <p className="text-gray-600 dark:text-gray-400 mb-4">
-                      การลบบัญชีนี้จะไม่สามารถยกเลิกได้ ข้อมูลทั้งหมดของคุณจะถูกลบอย่างถาวร
+                      การลบบัญชีนี้จะไม่สามารถยกเลิกได้
+                      ข้อมูลทั้งหมดของคุณจะถูกลบอย่างถาวร
                     </p>
                     <div className="bg-red-50 dark:bg-red-900/30 p-4 rounded-lg">
                       <p className="text-sm text-red-700 dark:text-red-300">
-                        • ข้อมูลส่วนตัวทั้งหมด<br />
-                        • ประวัติการทำธุรกรรม<br />
-                        • เป้าหมายการออมและงบประมาณ<br />
-                        • การตั้งค่าและคำแนะนำ
+                        • ข้อมูลส่วนตัวทั้งหมด
+                        <br />
+                        • ประวัติการทำธุรกรรม
+                        <br />
+                        • เป้าหมายการออมและงบประมาณ
+                        <br />• การตั้งค่าและคำแนะนำ
                       </p>
                     </div>
                   </div>
@@ -853,7 +1387,167 @@ export default function SettingsPage() {
                       disabled={isSaving}
                       className="flex-1 px-6 py-3 bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 disabled:from-gray-400 disabled:to-gray-500 text-white rounded-xl transition-all duration-200 font-medium disabled:cursor-not-allowed"
                     >
-                      {isSaving ? 'กำลังลบ...' : 'ลบบัญชีถาวร'}
+                      {isSaving ? "กำลังลบ..." : "ลบบัญชีถาวร"}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Category Modal */}
+        {categoryModalType && (
+          <div className="fixed inset-0 z-50 overflow-y-auto">
+            <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+              <div
+                className="fixed inset-0 transition-opacity backdrop-blur-sm"
+                onClick={() => setCategoryModalType(null)}
+              >
+                <div className="absolute inset-0 bg-gray-900/80 dark:bg-black/80"></div>
+              </div>
+
+              <div className="inline-block align-bottom bg-white dark:bg-gray-800 rounded-2xl text-left overflow-hidden shadow-2xl transform transition-all sm:my-8 sm:align-middle sm:max-w-md sm:w-full relative z-10 border border-gray-200 dark:border-gray-700">
+                {/* Header */}
+                <div
+                  className={`relative bg-gradient-to-r px-6 py-4 ${
+                    categoryModalType === "income"
+                      ? "from-green-500 to-emerald-600"
+                      : "from-red-500 to-red-600"
+                  }`}
+                >
+                  <div className="absolute inset-0 bg-white/10 backdrop-blur-sm"></div>
+                  <div className="relative flex items-center justify-between">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
+                        <span className="text-white text-xl">
+                          {categoryModalType === "income" ? "📈" : "📉"}
+                        </span>
+                      </div>
+                      <h3 className="text-xl font-bold text-white">
+                        {editingCategory ? "แก้ไข" : "เพิ่ม"}หมวดหมู่
+                        {categoryModalType === "income" ? "รายรับ" : "รายจ่าย"}
+                      </h3>
+                    </div>
+                    <button
+                      onClick={() => setCategoryModalType(null)}
+                      className="w-8 h-8 bg-white/20 hover:bg-white/30 rounded-lg flex items-center justify-center text-white transition-colors duration-200"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                </div>
+
+                <div className="bg-white dark:bg-gray-800 px-6 py-6">
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        ชื่อหมวดหมู่
+                      </label>
+                      <input
+                        type="text"
+                        value={categoryForm.name}
+                        onChange={(e) =>
+                          setCategoryForm({
+                            ...categoryForm,
+                            name: e.target.value,
+                          })
+                        }
+                        className="w-full px-4 py-3 border border-gray-200 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 dark:bg-gray-700 dark:text-white"
+                        placeholder="กรอกชื่อหมวดหมู่"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        ไอคอน
+                      </label>
+                      <div className="grid grid-cols-5 gap-2">
+                        {predefinedIcons.map((icon) => (
+                          <button
+                            key={icon}
+                            onClick={() =>
+                              setCategoryForm({ ...categoryForm, icon })
+                            }
+                            className={`w-12 h-12 rounded-lg border-2 flex items-center justify-center text-xl transition-all ${
+                              categoryForm.icon === icon
+                                ? "border-blue-500 bg-blue-50 dark:bg-blue-900/30"
+                                : "border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-500"
+                            }`}
+                          >
+                            {icon}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        สี
+                      </label>
+                      <div className="grid grid-cols-5 gap-2">
+                        {predefinedColors.map((color) => (
+                          <button
+                            key={color}
+                            onClick={() =>
+                              setCategoryForm({ ...categoryForm, color })
+                            }
+                            className={`w-12 h-12 rounded-lg border-2 transition-all ${
+                              categoryForm.color === color
+                                ? "border-gray-800 dark:border-white scale-110"
+                                : "border-gray-200 dark:border-gray-600 hover:scale-105"
+                            }`}
+                            style={{ backgroundColor: color }}
+                          >
+                            {categoryForm.color === color && (
+                              <span className="text-white text-lg">✓</span>
+                            )}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Preview */}
+                    <div className="border border-gray-200 dark:border-gray-600 rounded-lg p-4">
+                      <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        ตัวอย่าง
+                      </p>
+                      <div className="flex items-center space-x-2">
+                        <span className="text-2xl">{categoryForm.icon}</span>
+                        <span className="text-gray-900 dark:text-white">
+                          {categoryForm.name || "ชื่อหมวดหมู่"}
+                        </span>
+                      </div>
+                      <div
+                        className="w-full h-2 rounded-full mt-2"
+                        style={{ backgroundColor: categoryForm.color }}
+                      ></div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-gradient-to-r from-gray-50/80 to-gray-100/80 dark:from-gray-700/80 dark:to-gray-800/80 px-6 py-4 border-t border-gray-200/50 dark:border-gray-600/50">
+                  <div className="flex space-x-4">
+                    <button
+                      onClick={() => setCategoryModalType(null)}
+                      className="flex-1 px-6 py-3 border-2 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-700 transition-all duration-200 font-medium"
+                    >
+                      ยกเลิก
+                    </button>
+                    <button
+                      onClick={handleSaveCategory}
+                      disabled={isSaving || !categoryForm.name.trim()}
+                      className={`flex-1 px-6 py-3 bg-gradient-to-r text-white rounded-xl transition-all duration-200 font-medium disabled:cursor-not-allowed disabled:opacity-50 ${
+                        categoryModalType === "income"
+                          ? "from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700"
+                          : "from-red-500 to-red-600 hover:from-red-600 hover:to-red-700"
+                      }`}
+                    >
+                      {isSaving
+                        ? "กำลังบันทึก..."
+                        : editingCategory
+                        ? "บันทึกการแก้ไข"
+                        : "เพิ่มหมวดหมู่"}
                     </button>
                   </div>
                 </div>
