@@ -1,11 +1,39 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 
+interface Budget {
+  id: number;
+  category: string;
+  budgetAmount: number;
+  spentAmount: number;
+  month: string;
+  description: string;
+  transactions?: Transaction[];
+  isCompleted?: boolean;
+}
+
+interface Transaction {
+  date: string;
+  amount: number;
+  description: string;
+}
+
 export default function BudgetsPage() {
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState<'current' | 'history'>('current');
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [showExpenseModal, setShowExpenseModal] = useState(false);
+  const [editingBudget, setEditingBudget] = useState<Budget | null>(null);
+  const [selectedBudgetForExpense, setSelectedBudgetForExpense] = useState<Budget | null>(null);
+  const [newExpense, setNewExpense] = useState({
+    amount: '',
+    description: '',
+    date: new Date().toISOString().split('T')[0]
+  });
   const [newBudget, setNewBudget] = useState({
     category: '',
     amount: '',
@@ -14,7 +42,7 @@ export default function BudgetsPage() {
   });
 
   // Mock data - ในอนาคตจะเชื่อมกับ API
-  const mockCurrentBudgets = [
+  const [mockCurrentBudgets, setMockCurrentBudgets] = useState<Budget[]>([
     {
       id: 1,
       category: 'อาหาร',
@@ -62,9 +90,9 @@ export default function BudgetsPage() {
         { date: '2025-11-10', amount: 170, description: 'ค่าหนังที่ SF' }
       ]
     }
-  ];
+  ]);
 
-  const mockHistoryBudgets = [
+  const [mockHistoryBudgets, setMockHistoryBudgets] = useState<Budget[]>([
     {
       id: 5,
       category: 'อาหาร',
@@ -83,12 +111,28 @@ export default function BudgetsPage() {
       description: 'รถเมล์ แท็กซี่ Grab',
       isCompleted: true
     }
-  ];
+  ]);
 
   const filteredBudgets = activeTab === 'current' ? mockCurrentBudgets : mockHistoryBudgets;
 
   const handleCreateBudget = () => {
-    console.log('Creating budget:', newBudget);
+    if (!newBudget.category || !newBudget.amount) {
+      alert('กรุณากรอกข้อมูลให้ครบถ้วน');
+      return;
+    }
+
+    const newId = Math.max(...mockCurrentBudgets.map(b => b.id), ...mockHistoryBudgets.map(b => b.id)) + 1;
+    const newBudgetData: Budget = {
+      id: newId,
+      category: newBudget.category,
+      budgetAmount: parseFloat(newBudget.amount),
+      spentAmount: 0,
+      month: newBudget.month,
+      description: newBudget.description,
+      transactions: []
+    };
+
+    setMockCurrentBudgets(prev => [newBudgetData, ...prev]);
     setShowCreateModal(false);
     setNewBudget({
       category: '',
@@ -96,6 +140,96 @@ export default function BudgetsPage() {
       month: new Date().toISOString().slice(0, 7),
       description: ''
     });
+    alert('ตั้งงบประมาณใหม่เรียบร้อยแล้ว! 🎯');
+  };
+
+  const handleAddExpense = (budget: Budget) => {
+    setSelectedBudgetForExpense(budget);
+    setShowExpenseModal(true);
+  };
+
+  const confirmAddExpense = () => {
+    if (!selectedBudgetForExpense || !newExpense.amount || !newExpense.description) {
+      alert('กรุณากรอกข้อมูลให้ครบถ้วน');
+      return;
+    }
+
+    const expenseAmount = parseFloat(newExpense.amount);
+    const newTransaction: Transaction = {
+      date: newExpense.date,
+      amount: expenseAmount,
+      description: newExpense.description
+    };
+
+    setMockCurrentBudgets(prev => prev.map(budget => 
+      budget.id === selectedBudgetForExpense.id
+        ? {
+            ...budget,
+            spentAmount: budget.spentAmount + expenseAmount,
+            transactions: [newTransaction, ...(budget.transactions || [])]
+          }
+        : budget
+    ));
+
+    setShowExpenseModal(false);
+    setSelectedBudgetForExpense(null);
+    setNewExpense({
+      amount: '',
+      description: '',
+      date: new Date().toISOString().split('T')[0]
+    });
+    alert('บันทึกรายจ่ายเรียบร้อยแล้ว! 💸');
+  };
+
+  const handleEditBudget = (budget: Budget) => {
+    setEditingBudget(budget);
+    setShowEditModal(true);
+  };
+
+  const confirmEditBudget = () => {
+    if (!editingBudget) return;
+
+    setMockCurrentBudgets(prev => prev.map(budget => 
+      budget.id === editingBudget.id ? editingBudget : budget
+    ));
+
+    setShowEditModal(false);
+    setEditingBudget(null);
+    alert('แก้ไขงบประมาณเรียบร้อยแล้ว! ✅');
+  };
+
+  const handleReuseBudget = (budget: Budget) => {
+    const currentMonth = new Date().toISOString().slice(0, 7);
+    const newId = Math.max(...mockCurrentBudgets.map(b => b.id), ...mockHistoryBudgets.map(b => b.id)) + 1;
+    
+    const reusedBudget: Budget = {
+      ...budget,
+      id: newId,
+      month: currentMonth,
+      spentAmount: 0,
+      transactions: [],
+      isCompleted: undefined
+    };
+
+    setMockCurrentBudgets(prev => [reusedBudget, ...prev]);
+    alert('ใช้งบประมาณนี้อีกครั้งเรียบร้อยแล้ว! 🔄');
+  };
+
+  const handleViewDetails = (budgetId: number) => {
+    router.push(`/dashboard/budgets/${budgetId}`);
+  };
+
+  const handleViewSummary = (budget: Budget) => {
+    const overBudget = budget.spentAmount > budget.budgetAmount;
+    const percentage = Math.round((budget.spentAmount / budget.budgetAmount) * 100);
+    
+    alert(`📊 สรุปงบประมาณ ${budget.category}
+    
+🎯 งบที่ตั้งไว้: ฿${budget.budgetAmount.toLocaleString()}
+💰 ใช้จ่ายจริง: ฿${budget.spentAmount.toLocaleString()}
+📈 เปอร์เซ็นต์: ${percentage}%
+${overBudget ? '⚠️ เกินงบประมาณ!' : '✅ อยู่ในงบประมาณ'}
+📅 เดือน: ${new Date(budget.month + '-01').toLocaleDateString('th-TH', { year: 'numeric', month: 'long' })}`);
   };
 
   const totalBudget = mockCurrentBudgets.reduce((sum, budget) => sum + budget.budgetAmount, 0);
@@ -295,7 +429,7 @@ export default function BudgetsPage() {
                 </div>
 
                 {/* Recent Transactions (for current budgets only) */}
-                {activeTab === 'current' && 'transactions' in budget && (
+                {activeTab === 'current' && budget.transactions && budget.transactions.length > 0 && (
                   <div className="mb-4">
                     <h4 className="text-sm font-medium text-gray-900 dark:text-white mb-2">
                       รายการล่าสุด ({budget.transactions.length})
@@ -317,7 +451,10 @@ export default function BudgetsPage() {
                         </div>
                       ))}
                       {budget.transactions.length > 3 && (
-                        <button className="text-sm text-blue-600 dark:text-blue-400 hover:underline">
+                        <button 
+                          onClick={() => handleViewDetails(budget.id)}
+                          className="text-sm text-blue-600 dark:text-blue-400 hover:underline"
+                        >
                           ดูทั้งหมด ({budget.transactions.length} รายการ)
                         </button>
                       )}
@@ -329,22 +466,37 @@ export default function BudgetsPage() {
                 <div className="flex space-x-3">
                   {activeTab === 'current' ? (
                     <>
-                      <button className="flex-1 bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium">
+                      <button 
+                        onClick={() => handleAddExpense(budget)}
+                        className="flex-1 bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
+                      >
                         บันทึกรายจ่าย
                       </button>
-                      <button className="px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors text-sm">
+                      <button 
+                        onClick={() => handleEditBudget(budget)}
+                        className="px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors text-sm"
+                      >
                         แก้ไขงบ
                       </button>
-                      <button className="px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors text-sm">
+                      <button 
+                        onClick={() => handleViewDetails(budget.id)}
+                        className="px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors text-sm"
+                      >
                         ดูรายละเอียด
                       </button>
                     </>
                   ) : (
                     <>
-                      <button className="flex-1 bg-green-600 text-white py-2 px-4 rounded-lg hover:bg-green-700 transition-colors text-sm font-medium">
+                      <button 
+                        onClick={() => handleReuseBudget(budget)}
+                        className="flex-1 bg-green-600 text-white py-2 px-4 rounded-lg hover:bg-green-700 transition-colors text-sm font-medium"
+                      >
                         ใช้งบนี้อีกครั้ง
                       </button>
-                      <button className="px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors text-sm">
+                      <button 
+                        onClick={() => handleViewSummary(budget)}
+                        className="px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors text-sm"
+                      >
                         ดูสรุป
                       </button>
                     </>
@@ -373,19 +525,241 @@ export default function BudgetsPage() {
           </div>
         </div>
 
+        {/* Add Expense Modal */}
+        {showExpenseModal && selectedBudgetForExpense && (
+          <div className="fixed inset-0 z-50 overflow-y-auto">
+            <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+              <div 
+                className="fixed inset-0 transition-opacity backdrop-blur-sm" 
+                onClick={() => setShowExpenseModal(false)}
+              >
+                <div className="absolute inset-0 bg-white/90 dark:bg-gray-800/90"></div>
+              </div>
+
+              <div className="inline-block align-bottom bg-white dark:bg-gray-800 rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full relative z-10 border border-gray-200 dark:border-gray-700">
+                <div className="bg-white dark:bg-gray-800 px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-lg font-medium text-gray-900 dark:text-white">
+                      บันทึกรายจ่าย - {selectedBudgetForExpense.category}
+                    </h3>
+                    <button
+                      onClick={() => setShowExpenseModal(false)}
+                      className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-xl"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                  
+                  <div className="space-y-4">
+                    <div className="bg-blue-50 dark:bg-blue-900 rounded-lg p-4">
+                      <div className="flex justify-between text-sm">
+                        <span className="text-blue-700 dark:text-blue-300">งบประมาณคงเหลือ:</span>
+                        <span className={`font-semibold ${
+                          (selectedBudgetForExpense.budgetAmount - selectedBudgetForExpense.spentAmount) > 0
+                            ? 'text-green-600 dark:text-green-400'
+                            : 'text-red-600 dark:text-red-400'
+                        }`}>
+                          ฿{(selectedBudgetForExpense.budgetAmount - selectedBudgetForExpense.spentAmount).toLocaleString()}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        จำนวนเงิน *
+                      </label>
+                      <div className="relative">
+                        <span className="absolute left-3 top-2 text-gray-500 dark:text-gray-400">฿</span>
+                        <input
+                          type="number"
+                          value={newExpense.amount}
+                          onChange={(e) => setNewExpense(prev => ({...prev, amount: e.target.value}))}
+                          className="w-full pl-8 pr-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                          placeholder="350.00"
+                          min="0"
+                          step="0.01"
+                          required
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        รายละเอียด *
+                      </label>
+                      <textarea
+                        value={newExpense.description}
+                        onChange={(e) => setNewExpense(prev => ({...prev, description: e.target.value}))}
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                        rows={3}
+                        placeholder="ข้าวผัดกะเพรา + น้ำ"
+                        required
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        วันที่
+                      </label>
+                      <input
+                        type="date"
+                        value={newExpense.date}
+                        onChange={(e) => setNewExpense(prev => ({...prev, date: e.target.value}))}
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-gray-50 dark:bg-gray-700 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse gap-3">
+                  <button
+                    onClick={confirmAddExpense}
+                    disabled={!newExpense.amount || !newExpense.description}
+                    className="w-full inline-flex justify-center rounded-lg border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed sm:w-auto sm:text-sm transition-all"
+                  >
+                    💸 บันทึกรายจ่าย
+                  </button>
+                  <button
+                    onClick={() => setShowExpenseModal(false)}
+                    className="mt-3 sm:mt-0 w-full inline-flex justify-center rounded-lg border border-gray-300 dark:border-gray-600 shadow-sm px-4 py-2 bg-white dark:bg-gray-800 text-base font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 sm:w-auto sm:text-sm transition-all"
+                  >
+                    ❌ ยกเลิก
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Edit Budget Modal */}
+        {showEditModal && editingBudget && (
+          <div className="fixed inset-0 z-50 overflow-y-auto">
+            <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+              <div 
+                className="fixed inset-0 transition-opacity backdrop-blur-sm" 
+                onClick={() => setShowEditModal(false)}
+              >
+                <div className="absolute inset-0 bg-white/90 dark:bg-gray-800/90"></div>
+              </div>
+
+              <div className="inline-block align-bottom bg-white dark:bg-gray-800 rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full relative z-10 border border-gray-200 dark:border-gray-700">
+                <div className="bg-white dark:bg-gray-800 px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-lg font-medium text-gray-900 dark:text-white">
+                      แก้ไขงบประมาณ
+                    </h3>
+                    <button
+                      onClick={() => setShowEditModal(false)}
+                      className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-xl"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                  
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        หมวดหมู่
+                      </label>
+                      <select
+                        value={editingBudget.category}
+                        onChange={(e) => setEditingBudget(prev => prev ? ({...prev, category: e.target.value}) : null)}
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                      >
+                        {categories.map((category) => (
+                          <option key={category} value={category}>
+                            {category}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        จำนวนเงินงบประมาณ
+                      </label>
+                      <div className="relative">
+                        <span className="absolute left-3 top-2 text-gray-500 dark:text-gray-400">฿</span>
+                        <input
+                          type="number"
+                          value={editingBudget.budgetAmount}
+                          onChange={(e) => setEditingBudget(prev => prev ? ({...prev, budgetAmount: parseFloat(e.target.value) || 0}) : null)}
+                          className="w-full pl-8 pr-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                          min="0"
+                          step="0.01"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        เดือน
+                      </label>
+                      <input
+                        type="month"
+                        value={editingBudget.month}
+                        onChange={(e) => setEditingBudget(prev => prev ? ({...prev, month: e.target.value}) : null)}
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        รายละเอียด
+                      </label>
+                      <textarea
+                        value={editingBudget.description}
+                        onChange={(e) => setEditingBudget(prev => prev ? ({...prev, description: e.target.value}) : null)}
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                        rows={3}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-gray-50 dark:bg-gray-700 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse gap-3">
+                  <button
+                    onClick={confirmEditBudget}
+                    className="w-full inline-flex justify-center rounded-lg border border-transparent shadow-sm px-4 py-2 bg-green-600 text-base font-medium text-white hover:bg-green-700 sm:w-auto sm:text-sm transition-all"
+                  >
+                    💾 บันทึกการแก้ไข
+                  </button>
+                  <button
+                    onClick={() => setShowEditModal(false)}
+                    className="mt-3 sm:mt-0 w-full inline-flex justify-center rounded-lg border border-gray-300 dark:border-gray-600 shadow-sm px-4 py-2 bg-white dark:bg-gray-800 text-base font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 sm:w-auto sm:text-sm transition-all"
+                  >
+                    ❌ ยกเลิก
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Create Budget Modal */}
         {showCreateModal && (
           <div className="fixed inset-0 z-50 overflow-y-auto">
             <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
-              <div className="fixed inset-0 transition-opacity" onClick={() => setShowCreateModal(false)}>
-                <div className="absolute inset-0 bg-gray-500 opacity-75"></div>
+              <div 
+                className="fixed inset-0 transition-opacity backdrop-blur-sm" 
+                onClick={() => setShowCreateModal(false)}
+              >
+                <div className="absolute inset-0 bg-white/90 dark:bg-gray-800/90"></div>
               </div>
 
-              <div className="inline-block align-bottom bg-white dark:bg-gray-800 rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+              <div className="inline-block align-bottom bg-white dark:bg-gray-800 rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full relative z-10 border border-gray-200 dark:border-gray-700">
                 <div className="bg-white dark:bg-gray-800 px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
-                  <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
-                    ตั้งงบประมาณใหม่
-                  </h3>
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-lg font-medium text-gray-900 dark:text-white">
+                      ตั้งงบประมาณใหม่
+                    </h3>
+                    <button
+                      onClick={() => setShowCreateModal(false)}
+                      className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-xl"
+                    >
+                      ✕
+                    </button>
+                  </div>
                   
                   <div className="space-y-4">
                     <div>
@@ -446,18 +820,19 @@ export default function BudgetsPage() {
                   </div>
                 </div>
 
-                <div className="bg-gray-50 dark:bg-gray-700 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                <div className="bg-gray-50 dark:bg-gray-700 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse gap-3">
                   <button
                     onClick={handleCreateBudget}
-                    className="w-full inline-flex justify-center rounded-lg border border-transparent shadow-sm px-4 py-2 bg-gray-900 dark:bg-white text-base font-medium text-white dark:text-gray-900 hover:bg-gray-800 dark:hover:bg-gray-100 sm:ml-3 sm:w-auto sm:text-sm"
+                    disabled={!newBudget.category || !newBudget.amount}
+                    className="w-full inline-flex justify-center rounded-lg border border-transparent shadow-sm px-4 py-2 bg-gray-900 dark:bg-white text-base font-medium text-white dark:text-gray-900 hover:bg-gray-800 dark:hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed sm:w-auto sm:text-sm transition-all"
                   >
-                    ตั้งงบประมาณ
+                    🎯 ตั้งงบประมาณ
                   </button>
                   <button
                     onClick={() => setShowCreateModal(false)}
-                    className="mt-3 w-full inline-flex justify-center rounded-lg border border-gray-300 dark:border-gray-600 shadow-sm px-4 py-2 bg-white dark:bg-gray-800 text-base font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
+                    className="mt-3 sm:mt-0 w-full inline-flex justify-center rounded-lg border border-gray-300 dark:border-gray-600 shadow-sm px-4 py-2 bg-white dark:bg-gray-800 text-base font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 sm:w-auto sm:text-sm transition-all"
                   >
-                    ยกเลิก
+                    ❌ ยกเลิก
                   </button>
                 </div>
               </div>
