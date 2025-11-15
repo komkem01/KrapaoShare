@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import DashboardLayout from '@/components/layout/DashboardLayout';
-import AccountSelector from '@/components/ui/AccountSelector';
+import AccountSelector, { Account } from '@/components/ui/AccountSelector';
 
 // Types
 interface Deposit {
@@ -23,16 +23,6 @@ interface Goal {
   createdDate: string;
   deposits: Deposit[];
   completedDate?: string;
-}
-
-interface Account {
-  id: number;
-  name: string;
-  type: 'personal' | 'shared';
-  balance: number;
-  color: string;
-  bankName?: string;
-  isDefault: boolean;
 }
 
 export default function GoalsPage() {
@@ -65,26 +55,24 @@ export default function GoalsPage() {
       name: 'บัญชีออมทรัพย์หลัก',
       type: 'personal',
       balance: 45800,
-      color: '#10B981',
-      bankName: 'ธนาคารกสิกรไทย',
-      isDefault: true
+      bank: 'ธนาคารกสิกรไทย',
+      accountNumber: 'xxx-x-x1234-x'
     },
     {
       id: 2,
       name: 'บัญชีกระแสรายวัน',
       type: 'personal',
       balance: 12500,
-      color: '#3B82F6',
-      bankName: 'ธนาคารกรุงเทพ',
-      isDefault: false
+      bank: 'ธนาคารกรุงเทพ',
+      accountNumber: 'xxx-x-x5678-x'
     },
     {
       id: 3,
       name: 'ทริปญี่ปุ่น 2026',
       type: 'shared',
       balance: 45000,
-      color: '#8B5CF6',
-      isDefault: false
+      bank: 'กลุ่ม',
+      accountNumber: 'shared-001'
     }
   ];
 
@@ -836,9 +824,7 @@ export default function GoalsPage() {
                     <AccountSelector
                       accounts={mockAccounts}
                       selectedAccountId={selectedAccountId}
-                      onAccountChange={setSelectedAccountId}
-                      required={true}
-                      showBalance={true}
+                      onSelect={(account) => setSelectedAccountId(account.id)}
                     />
 
                     <div className="group">
