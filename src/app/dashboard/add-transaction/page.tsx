@@ -23,10 +23,10 @@ export default function AddTransactionPage() {
   const incomeCategory = useCategorySelector('income');
 
   // ดึงข้อมูลบัญชีจำลอง (ในอนาคตจะเชื่อมกับ API)
-  const mockAccounts = [
-    { id: 1, name: 'บัญชีออมทรัพย์ SCB', type: 'personal' as const, balance: 25000, bank: 'ธนาคารไทยพาณิชย์', accountNumber: 'xxx-x-x1234-x' },
-    { id: 2, name: 'บัญชีกระแสรายวัน BBL', type: 'personal' as const, balance: 8500, bank: 'ธนาคารกรุงเทพ', accountNumber: 'xxx-x-x5678-x' },
-    { id: 3, name: 'กลุ่มเพื่อนบ้าน - ค่าส่วนกลาง', type: 'shared' as const, balance: 12000, bank: 'กลุ่ม', accountNumber: 'shared-001' }
+  const mockAccounts: Account[] = [
+    { id: 1, name: 'บัญชีออมทรัพย์ SCB', type: 'personal', balance: 25000, bank: 'ธนาคารไทยพาณิชย์', accountNumber: 'xxx-x-x1234-x' },
+    { id: 2, name: 'บัญชีกระแสรายวัน BBL', type: 'personal', balance: 8500, bank: 'ธนาคารกรุงเทพ', accountNumber: 'xxx-x-x5678-x' },
+    { id: 3, name: 'กลุ่มเพื่อนบ้าน - ค่าส่วนกลาง', type: 'shared', balance: 12000, bank: 'กลุ่ม', accountNumber: 'shared-001' }
   ];
 
   const selectedAccount = mockAccounts.find(acc => acc.id === selectedAccountId);
@@ -70,37 +70,36 @@ export default function AddTransactionPage() {
         type: activeTab,
         accountId: selectedAccountId,
         categoryId: currentCategory.selectedCategory?.id,
-        category: currentCategory.selectedCategory,
         amount: parseFloat(amount),
-        description: description.trim(),
-        date,
-        timestamp: new Date().toISOString()
+        description,
+        date
       };
 
       console.log('Transaction saved:', transactionData);
 
-      addNotification(createNotification.success(
-        'บันทึกสำเร็จ',
-        `บันทึก${activeTab === 'income' ? 'รายรับ' : 'รายจ่าย'}จำนวน ฿${parseFloat(amount).toLocaleString()} เรียบร้อยแล้ว`,
-        'transaction'
-      ));
-
-      // Reset form
-      setSelectedAccountId(null);
+      // รีเซ็ตฟอร์ม
       setAmount('');
       setDescription('');
+      currentCategory.reset();
       setDate(new Date().toISOString().split('T')[0]);
-      expenseCategory.reset();
-      incomeCategory.reset();
 
-      // กลับไปหน้าหลัก
+      // แสดงการแจ้งเตือนสำเร็จ
+      addNotification(
+        createNotification.success(
+          'บันทึกสำเร็จ',
+          `บันทึก${activeTab === 'expense' ? 'รายจ่าย' : 'รายรับ'} ${parseFloat(amount).toLocaleString()} บาท`,
+          'transaction'
+        )
+      );
+
+      // กลับไปหน้า Dashboard
       setTimeout(() => {
         router.push('/dashboard');
       }, 1000);
 
     } catch (error) {
       console.error('Error saving transaction:', error);
-      addNotification(createNotification.error('เกิดข้อผิดพลาด', 'ไม่สามารถบันทึกข้อมูลได้ กรุณาลองใหม่อีกครั้ง', 'transaction'));
+      addNotification(createNotification.error('เกิดข้อผิดพลาด', 'ไม่สามารถบันทึกรายการได้ กรุณาลองใหม่อีกครั้ง', 'transaction'));
     } finally {
       setIsSubmitting(false);
     }
@@ -110,124 +109,98 @@ export default function AddTransactionPage() {
     <DashboardLayout>
       <div className="max-w-2xl mx-auto space-y-6">
         {/* Header */}
-        <div className="text-center">
-          <h1 className="text-2xl font-light text-gray-900 dark:text-white">
-            บันทึกรายการ
-          </h1>
-          <p className="text-gray-600 dark:text-gray-400 mt-1">
-            เพิ่มรายรับหรือรายจ่ายใหม่
-          </p>
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">บันทึกรายรับ-รายจ่าย</h1>
+          <p className="text-gray-600 dark:text-gray-400 mt-1">เพิ่มรายการเงินเข้าหรือออก</p>
         </div>
 
-        <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 overflow-hidden">
-          {/* Tab Headers */}
-          <div className="flex">
-            <button
-              onClick={() => setActiveTab('expense')}
-              className={`flex-1 px-6 py-4 text-center font-medium transition-all duration-200 ${
-                activeTab === 'expense'
-                  ? 'bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 border-b-2 border-red-500'
-                  : 'bg-gray-50 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-600'
-              }`}
-            >
-              <div className="flex items-center justify-center space-x-2">
-                <span className="text-xl">📉</span>
-                <span>รายจ่าย</span>
-              </div>
-            </button>
-            <button
-              onClick={() => setActiveTab('income')}
-              className={`flex-1 px-6 py-4 text-center font-medium transition-all duration-200 ${
-                activeTab === 'income'
-                  ? 'bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 border-b-2 border-green-500'
-                  : 'bg-gray-50 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-600'
-              }`}
-            >
-              <div className="flex items-center justify-center space-x-2">
-                <span className="text-xl">📈</span>
-                <span>รายรับ</span>
-              </div>
-            </button>
-          </div>
+        {/* Type Tabs */}
+        <div className="bg-white dark:bg-gray-800 rounded-xl p-2 flex gap-2">
+          <button
+            onClick={() => setActiveTab('expense')}
+            className={`flex-1 py-3 px-4 rounded-lg font-medium transition-all ${
+              activeTab === 'expense'
+                ? 'bg-red-500 text-white shadow-md'
+                : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'
+            }`}
+          >
+            <span className="text-lg mr-2">💸</span>
+            รายจ่าย
+          </button>
+          <button
+            onClick={() => setActiveTab('income')}
+            className={`flex-1 py-3 px-4 rounded-lg font-medium transition-all ${
+              activeTab === 'income'
+                ? 'bg-green-500 text-white shadow-md'
+                : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'
+            }`}
+          >
+            <span className="text-lg mr-2">💰</span>
+            รายรับ
+          </button>
+        </div>
 
-          {/* Form Content */}
-          <div className="p-6 space-y-6">
-            {/* Account Selection */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Left Column - Form */}
+          <div className="lg:col-span-2 bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm space-y-6">
+            {/* Account Selector */}
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                เลือกบัญชี *
+                เลือกบัญชี <span className="text-red-500">*</span>
               </label>
               <AccountSelector
                 accounts={mockAccounts}
                 selectedAccountId={selectedAccountId}
-                onSelect={(account: Account) => setSelectedAccountId(account.id)}
-                placeholder="เลือกบัญชีที่จะทำรายการ"
+                onSelect={(account) => setSelectedAccountId(account.id)}
+                placeholder="เลือกบัญชีที่ต้องการทำรายการ"
               />
             </div>
 
-            {/* Category Selection */}
+            {/* Category Selector */}
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                หมวดหมู่ *
+                หมวดหมู่ <span className="text-red-500">*</span>
               </label>
               <CategorySelector
                 type={activeTab}
                 selectedCategoryId={currentCategory.selectedCategoryId}
                 onSelect={currentCategory.handleSelect}
-                placeholder={`เลือกหมวดหมู่${activeTab === 'income' ? 'รายรับ' : 'รายจ่าย'}`}
+                placeholder={`เลือกหมวดหมู่${activeTab === 'expense' ? 'รายจ่าย' : 'รายรับ'}`}
               />
             </div>
 
-            {/* Amount */}
+            {/* Amount Input */}
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                จำนวนเงิน *
+                จำนวนเงิน <span className="text-red-500">*</span>
               </label>
               <div className="relative">
-                <span className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-500 dark:text-gray-400">
-                  ฿
-                </span>
+                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 dark:text-gray-400">฿</span>
                 <input
                   type="number"
                   value={amount}
                   onChange={(e) => setAmount(e.target.value)}
-                  className="w-full pl-8 pr-4 py-3 border border-gray-200 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 dark:bg-gray-700 dark:text-white"
                   placeholder="0.00"
-                  min="0"
-                  step="0.01"
+                  className="w-full pl-10 pr-4 py-3 border border-gray-200 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 />
               </div>
-              {selectedAccount && activeTab === 'expense' && amount && (
-                <div className="mt-2 text-sm">
-                  <span className="text-gray-600 dark:text-gray-400">
-                    ยอดคงเหลือหลังทำรายการ: 
-                  </span>
-                  <span className={`font-medium ml-1 ${
-                    selectedAccount.balance - parseFloat(amount || '0') < 0
-                      ? 'text-red-600 dark:text-red-400'
-                      : 'text-green-600 dark:text-green-400'
-                  }`}>
-                    ฿{(selectedAccount.balance - parseFloat(amount || '0')).toLocaleString()}
-                  </span>
-                </div>
-              )}
             </div>
 
-            {/* Description */}
+            {/* Description Input */}
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                รายละเอียด *
+                รายละเอียด <span className="text-red-500">*</span>
               </label>
               <textarea
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                className="w-full px-4 py-3 border border-gray-200 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 dark:bg-gray-700 dark:text-white resize-none"
+                placeholder="ระบุรายละเอียดเพิ่มเติม..."
                 rows={3}
-                placeholder="กรอกรายละเอียดการทำรายการ..."
+                className="w-full px-4 py-3 border border-gray-200 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
               />
             </div>
 
-            {/* Date */}
+            {/* Date Input */}
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 วันที่
@@ -236,66 +209,97 @@ export default function AddTransactionPage() {
                 type="date"
                 value={date}
                 onChange={(e) => setDate(e.target.value)}
-                className="w-full px-4 py-3 border border-gray-200 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 dark:bg-gray-700 dark:text-white"
+                className="w-full px-4 py-3 border border-gray-200 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               />
             </div>
 
-            {/* Preview Card */}
-            {(selectedAccountId && currentCategory.selectedCategory && amount && description) && (
-              <div className="border border-gray-200 dark:border-gray-600 rounded-xl p-4 bg-gray-50 dark:bg-gray-700">
-                <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">ตัวอย่างรายการ</h4>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-3">
-                    <span 
-                      className="text-xl p-2 rounded-lg"
-                      style={{ backgroundColor: `${currentCategory.selectedCategory.color}20` }}
-                    >
-                      {currentCategory.selectedCategory.icon}
-                    </span>
-                    <div>
-                      <p className="font-medium text-gray-900 dark:text-white">
-                        {description}
-                      </p>
-                      <p className="text-sm text-gray-600 dark:text-gray-400">
-                        {currentCategory.selectedCategory.name} • {selectedAccount?.name}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <p className={`font-semibold ${
-                      activeTab === 'income' 
-                        ? 'text-green-600 dark:text-green-400' 
-                        : 'text-red-600 dark:text-red-400'
-                    }`}>
-                      {activeTab === 'income' ? '+' : '-'}฿{parseFloat(amount).toLocaleString()}
-                    </p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">
-                      {new Date(date).toLocaleDateString('th-TH')}
-                    </p>
+            {/* Submit Button */}
+            <button
+              onClick={handleSubmit}
+              disabled={isSubmitting}
+              className={`w-full py-3 rounded-xl font-medium transition-all ${
+                isSubmitting
+                  ? 'bg-gray-300 dark:bg-gray-600 text-gray-500 dark:text-gray-400 cursor-not-allowed'
+                  : activeTab === 'expense'
+                  ? 'bg-red-500 hover:bg-red-600 text-white shadow-md hover:shadow-lg'
+                  : 'bg-green-500 hover:bg-green-600 text-white shadow-md hover:shadow-lg'
+              }`}
+            >
+              {isSubmitting ? (
+                <span className="flex items-center justify-center">
+                  <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  กำลังบันทึก...
+                </span>
+              ) : (
+                `บันทึก${activeTab === 'expense' ? 'รายจ่าย' : 'รายรับ'}`
+              )}
+            </button>
+          </div>
+
+          {/* Right Column - Summary */}
+          <div className="space-y-6">
+            {/* Selected Account Info */}
+            {selectedAccount && (
+              <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl p-6 text-white shadow-lg">
+                <h3 className="text-sm font-medium opacity-90 mb-2">บัญชีที่เลือก</h3>
+                <div className="space-y-2">
+                  <p className="font-semibold text-lg">{selectedAccount.name}</p>
+                  <p className="text-sm opacity-90">{selectedAccount.bank}</p>
+                  <div className="pt-3 border-t border-white/20">
+                    <p className="text-xs opacity-75 mb-1">ยอดคงเหลือ</p>
+                    <p className="text-2xl font-bold">฿{selectedAccount.balance.toLocaleString()}</p>
                   </div>
                 </div>
               </div>
             )}
 
-            {/* Actions */}
-            <div className="flex space-x-4 pt-4">
-              <button
-                onClick={() => router.back()}
-                className="flex-1 px-6 py-3 border-2 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-700 transition-all duration-200 font-medium"
-              >
-                ยกเลิก
-              </button>
-              <button
-                onClick={handleSubmit}
-                disabled={isSubmitting || !selectedAccountId || !currentCategory.selectedCategory || !amount || !description.trim()}
-                className={`flex-1 px-6 py-3 rounded-xl font-medium transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-50 ${
-                  activeTab === 'income'
-                    ? 'bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white'
-                    : 'bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white'
-                }`}
-              >
-                {isSubmitting ? 'กำลังบันทึก...' : `บันทึก${activeTab === 'income' ? 'รายรับ' : 'รายจ่าย'}`}
-              </button>
+            {/* Transaction Summary */}
+            {amount && parseFloat(amount) > 0 && (
+              <div className={`rounded-xl p-6 shadow-lg ${
+                activeTab === 'expense'
+                  ? 'bg-gradient-to-br from-red-500 to-red-600'
+                  : 'bg-gradient-to-br from-green-500 to-green-600'
+              } text-white`}>
+                <h3 className="text-sm font-medium opacity-90 mb-2">สรุปรายการ</h3>
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center">
+                    <span className="opacity-90">ประเภท</span>
+                    <span className="font-medium">{activeTab === 'expense' ? 'รายจ่าย' : 'รายรับ'}</span>
+                  </div>
+                  {currentCategory.selectedCategory && (
+                    <div className="flex justify-between items-center">
+                      <span className="opacity-90">หมวดหมู่</span>
+                      <span className="font-medium">{currentCategory.selectedCategory.name}</span>
+                    </div>
+                  )}
+                  <div className="pt-3 border-t border-white/20">
+                    <p className="text-xs opacity-75 mb-1">จำนวนเงิน</p>
+                    <p className="text-3xl font-bold">฿{parseFloat(amount).toLocaleString()}</p>
+                  </div>
+                  {selectedAccount && activeTab === 'expense' && (
+                    <div className="pt-3 border-t border-white/20">
+                      <p className="text-xs opacity-75 mb-1">ยอดคงเหลือหลังหัก</p>
+                      <p className="text-xl font-bold">
+                        ฿{(selectedAccount.balance - parseFloat(amount)).toLocaleString()}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Help Text */}
+            <div className="bg-gray-50 dark:bg-gray-700 rounded-xl p-4">
+              <h4 className="text-sm font-medium text-gray-900 dark:text-white mb-2">💡 เคล็ดลับ</h4>
+              <ul className="text-xs text-gray-600 dark:text-gray-400 space-y-1">
+                <li>• เลือกบัญชีที่ต้องการทำรายการ</li>
+                <li>• เลือกหมวดหมู่ที่เหมาะสม</li>
+                <li>• ใส่จำนวนเงินและรายละเอียด</li>
+                <li>• ตรวจสอบข้อมูลก่อนบันทึก</li>
+              </ul>
             </div>
           </div>
         </div>

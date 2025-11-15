@@ -62,10 +62,6 @@ export default function AccountSelector({
     return '🏦';
   };
 
-  const getAccountTypeLabel = (account: Account) => {
-    return account.type === 'personal' ? 'บัญชีส่วนตัว' : 'บัญชีร่วม';
-  };
-
   return (
     <div className={`relative ${className}`} ref={dropdownRef}>
       <button

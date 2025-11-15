@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import DashboardLayout from '@/components/layout/DashboardLayout';
+import AccountSelector, { Account } from '@/components/ui/AccountSelector';
 
 // Types
 interface Deposit {
@@ -35,6 +36,7 @@ export default function GoalsPage() {
   const [selectedGoal, setSelectedGoal] = useState<Goal | null>(null);
   const [depositAmount, setDepositAmount] = useState('');
   const [depositNote, setDepositNote] = useState('');
+  const [selectedAccountId, setSelectedAccountId] = useState<number>(1);
   
   const [newGoal, setNewGoal] = useState({
     name: '',
@@ -45,6 +47,34 @@ export default function GoalsPage() {
   });
 
   const [goals, setGoals] = useState<Goal[]>([]);
+
+  // Mock accounts data
+  const mockAccounts: Account[] = [
+    {
+      id: 1,
+      name: 'บัญชีออมทรัพย์หลัก',
+      type: 'personal',
+      balance: 45800,
+      bank: 'ธนาคารกสิกรไทย',
+      accountNumber: 'xxx-x-x1234-x'
+    },
+    {
+      id: 2,
+      name: 'บัญชีกระแสรายวัน',
+      type: 'personal',
+      balance: 12500,
+      bank: 'ธนาคารกรุงเทพ',
+      accountNumber: 'xxx-x-x5678-x'
+    },
+    {
+      id: 3,
+      name: 'ทริปญี่ปุ่น 2026',
+      type: 'shared',
+      balance: 45000,
+      bank: 'กลุ่ม',
+      accountNumber: 'shared-001'
+    }
+  ];
 
   // Mock data - ในอนาคตจะเชื่อมกับ API
   const mockActiveGoals: Goal[] = [
@@ -159,6 +189,17 @@ export default function GoalsPage() {
     }
 
     const amount = parseFloat(depositAmount);
+    const selectedAccount = mockAccounts.find(acc => acc.id === selectedAccountId);
+    
+    if (!selectedAccount) {
+      alert('กรุณาเลือกบัญชี');
+      return;
+    }
+
+    if (amount > selectedAccount.balance) {
+      alert(`ยอดเงินในบัญชีไม่เพียงพอ (คงเหลือ ฿${selectedAccount.balance.toLocaleString()})`);
+      return;
+    }
     const deposit: Deposit = {
       date: new Date().toISOString().split('T')[0],
       amount,
@@ -779,6 +820,13 @@ export default function GoalsPage() {
                   )}
                   
                   <div className="space-y-6">
+                    {/* Account Selector */}
+                    <AccountSelector
+                      accounts={mockAccounts}
+                      selectedAccountId={selectedAccountId}
+                      onSelect={(account) => setSelectedAccountId(account.id)}
+                    />
+
                     <div className="group">
                       <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center space-x-2">
                         <span className="w-2 h-2 bg-green-500 rounded-full"></span>
