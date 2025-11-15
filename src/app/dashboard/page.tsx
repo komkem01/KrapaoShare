@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 
 export default function DashboardPage() {
@@ -95,22 +96,22 @@ export default function DashboardPage() {
             การดำเนินการด่วน
           </h3>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <button className="flex flex-col items-center space-y-2 p-4 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+            <Link href="/dashboard/transactions" className="flex flex-col items-center space-y-2 p-4 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
               <span className="text-2xl">💸</span>
               <span className="text-sm font-medium text-gray-900 dark:text-white">เพิ่มรายจ่าย</span>
-            </button>
-            <button className="flex flex-col items-center space-y-2 p-4 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+            </Link>
+            <Link href="/dashboard/transactions" className="flex flex-col items-center space-y-2 p-4 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
               <span className="text-2xl">💵</span>
               <span className="text-sm font-medium text-gray-900 dark:text-white">เพิ่มรายรับ</span>
-            </button>
-            <button className="flex flex-col items-center space-y-2 p-4 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+            </Link>
+            <Link href="/dashboard/bills" className="flex flex-col items-center space-y-2 p-4 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
               <span className="text-2xl">🧾</span>
               <span className="text-sm font-medium text-gray-900 dark:text-white">แบ่งบิล</span>
-            </button>
-            <button className="flex flex-col items-center space-y-2 p-4 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+            </Link>
+            <Link href="/dashboard/goals" className="flex flex-col items-center space-y-2 p-4 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
               <span className="text-2xl">🎯</span>
               <span className="text-sm font-medium text-gray-900 dark:text-white">ตั้งเป้าหมาย</span>
-            </button>
+            </Link>
           </div>
         </div>
 
@@ -121,9 +122,9 @@ export default function DashboardPage() {
               <h3 className="text-lg font-medium text-gray-900 dark:text-white">
                 รายการล่าสุด
               </h3>
-              <button className="text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300">
+              <Link href="/dashboard/transactions" className="text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300">
                 ดูทั้งหมด →
-              </button>
+              </Link>
             </div>
             <div className="space-y-3">
               {mockData.recentTransactions.map((transaction) => (
@@ -174,9 +175,9 @@ export default function DashboardPage() {
               <h3 className="text-lg font-medium text-gray-900 dark:text-white">
                 งบประมาณเดือนนี้
               </h3>
-              <button className="text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300">
+              <Link href="/dashboard/budgets" className="text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300">
                 จัดการ →
-              </button>
+              </Link>
             </div>
             <div className="space-y-4">
               <div>
