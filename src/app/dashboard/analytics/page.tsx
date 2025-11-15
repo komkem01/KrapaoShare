@@ -6,6 +6,17 @@ import DashboardLayout from '@/components/layout/DashboardLayout';
 export default function AnalyticsPage() {
   const [selectedPeriod, setSelectedPeriod] = useState<'week' | 'month' | 'year'>('month');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [showGoalModal, setShowGoalModal] = useState(false);
+  const [showAdviceModal, setShowAdviceModal] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
+  const [showSuccessMessage, setShowSuccessMessage] = useState(false);
+  const [newGoal, setNewGoal] = useState({
+    name: '',
+    target: '',
+    category: 'saving',
+    deadline: ''
+  });
 
   // Mock data - ในอนาคตจะเชื่อมกับ API
   const mockMonthlyData = [
@@ -48,6 +59,99 @@ export default function AnalyticsPage() {
   const avgMonthlyExpense = totalExpense / mockMonthlyData.length;
   const maxExpense = Math.max(...mockWeeklySpending.map(day => day.amount));
 
+  // Functions
+  const handleExportPDF = async () => {
+    setIsExporting(true);
+    
+    // Simulate PDF generation
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    
+    // Create mock PDF data
+    const reportData = {
+      period: selectedPeriod,
+      totalIncome,
+      totalExpense,
+      totalSavings,
+      categories: mockCategoryData,
+      weeklySpending: mockWeeklySpending,
+      goalsProgress: mockGoalsProgress,
+      generatedAt: new Date().toISOString()
+    };
+    
+    const blob = new Blob([JSON.stringify(reportData, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `financial-report-${selectedPeriod}-${new Date().toISOString().split('T')[0]}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    
+    setIsExporting(false);
+    setShowExportModal(false);
+    setShowSuccessMessage(true);
+    setTimeout(() => setShowSuccessMessage(false), 3000);
+  };
+
+  const handleViewLastYear = () => {
+    // In a real app, this would fetch last year's data
+    alert('ฟีเจอร์นี้จะแสดงข้อมูลปีก่อนหน้า กำลังพัฒนา...');
+  };
+
+  const handleCreateGoal = async () => {
+    if (!newGoal.name || !newGoal.target || !newGoal.deadline) {
+      alert('กรุณากรอกข้อมูลให้ครบถ้วน');
+      return;
+    }
+
+    if (parseFloat(newGoal.target) <= 0) {
+      alert('เป้าหมายต้องมากกว่า 0');
+      return;
+    }
+
+    setIsExporting(true);
+    // Simulate API call to create goal
+    await new Promise(resolve => setTimeout(resolve, 1500));
+    
+    setIsExporting(false);
+    setShowGoalModal(false);
+    setNewGoal({ name: '', target: '', category: 'saving', deadline: '' });
+    setShowSuccessMessage(true);
+    setTimeout(() => setShowSuccessMessage(false), 3000);
+  };
+
+  const handleGetAdvice = () => {
+    setShowAdviceModal(true);
+  };
+
+  const generateAdvice = () => {
+    const savingsRate = (totalSavings / totalIncome) * 100;
+    const advice = [];
+    
+    if (savingsRate < 20) {
+      advice.push('💡 ลองเพิ่มอัตราการออมให้ถึง 20% ของรายรับ');
+    }
+    
+    const highestExpense = mockCategoryData.reduce((prev, current) => 
+      prev.amount > current.amount ? prev : current
+    );
+    
+    if (highestExpense.percentage > 40) {
+      advice.push(`💡 การใช้จ่ายในหมวด "${highestExpense.category}" สูงเกินไป ลองลดลง 5-10%`);
+    }
+    
+    const lastMonth = mockMonthlyData[mockMonthlyData.length - 1];
+    if (lastMonth.expense > lastMonth.income * 0.8) {
+      advice.push('💡 รายจ่ายสูงเกินไป ควรควบคุมให้ไม่เกิน 80% ของรายรับ');
+    }
+    
+    advice.push('💡 ลองใช้กฎ 50/30/20: 50% ความจำเป็น, 30% ความต้องการ, 20% การออม');
+    advice.push('💡 ตั้งเป้าหมายฉุกเฉินให้มีเงินออมพออยู่ได้ 3-6 เดือน');
+    
+    return advice;
+  };
+
   // Calculate trend
   const lastThreeMonths = mockMonthlyData.slice(-3);
   const expenseTrend = lastThreeMonths[2].expense > lastThreeMonths[0].expense ? 'increasing' : 'decreasing';
@@ -55,6 +159,14 @@ export default function AnalyticsPage() {
 
   return (
     <DashboardLayout>
+      {/* Success Message */}
+      {showSuccessMessage && (
+        <div className="fixed top-4 right-4 z-50 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg flex items-center space-x-2 animate-slide-in">
+          <span className="text-lg">✅</span>
+          <span className="font-medium">ดำเนินการสำเร็จ!</span>
+        </div>
+      )}
+      
       <div className="space-y-6">
         {/* Header */}
         <div className="flex justify-between items-center">
@@ -375,24 +487,303 @@ export default function AnalyticsPage() {
             ดำเนินการเพิ่มเติม
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <button className="flex items-center justify-center space-x-2 bg-blue-600 text-white py-3 px-4 rounded-lg hover:bg-blue-700 transition-colors">
+            <button 
+              onClick={() => setShowExportModal(true)}
+              className="flex items-center justify-center space-x-2 bg-blue-600 text-white py-3 px-4 rounded-lg hover:bg-blue-700 transition-colors"
+            >
               <span>📊</span>
               <span className="font-medium">ส่งออกรายงาน PDF</span>
             </button>
-            <button className="flex items-center justify-center space-x-2 bg-green-600 text-white py-3 px-4 rounded-lg hover:bg-green-700 transition-colors">
+            <button 
+              onClick={handleViewLastYear}
+              className="flex items-center justify-center space-x-2 bg-green-600 text-white py-3 px-4 rounded-lg hover:bg-green-700 transition-colors"
+            >
               <span>📈</span>
               <span className="font-medium">ดูแนวโน้มปีก่อน</span>
             </button>
-            <button className="flex items-center justify-center space-x-2 bg-purple-600 text-white py-3 px-4 rounded-lg hover:bg-purple-700 transition-colors">
+            <button 
+              onClick={() => setShowGoalModal(true)}
+              className="flex items-center justify-center space-x-2 bg-purple-600 text-white py-3 px-4 rounded-lg hover:bg-purple-700 transition-colors"
+            >
               <span>🎯</span>
               <span className="font-medium">ตั้งเป้าหมายใหม่</span>
             </button>
-            <button className="flex items-center justify-center space-x-2 bg-orange-600 text-white py-3 px-4 rounded-lg hover:bg-orange-700 transition-colors">
+            <button 
+              onClick={handleGetAdvice}
+              className="flex items-center justify-center space-x-2 bg-orange-600 text-white py-3 px-4 rounded-lg hover:bg-orange-700 transition-colors"
+            >
               <span>💡</span>
               <span className="font-medium">คำแนะนำเพิ่มเติม</span>
             </button>
           </div>
         </div>
+
+        {/* Export Modal */}
+        {showExportModal && (
+          <div className="fixed inset-0 z-50 overflow-y-auto">
+            <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+              <div 
+                className="fixed inset-0 transition-opacity backdrop-blur-sm" 
+                onClick={() => setShowExportModal(false)}
+              >
+                <div className="absolute inset-0 bg-gray-900/80 dark:bg-black/80"></div>
+              </div>
+
+              <div className="inline-block align-bottom bg-white dark:bg-gray-800 rounded-2xl text-left overflow-hidden shadow-2xl transform transition-all sm:my-8 sm:align-middle sm:max-w-md sm:w-full relative z-10 border border-gray-200 dark:border-gray-700">
+                <div className="relative bg-gradient-to-r from-blue-500 to-indigo-600 px-6 py-4">
+                  <div className="absolute inset-0 bg-white/10 backdrop-blur-sm"></div>
+                  <div className="relative flex items-center justify-between">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
+                        <span className="text-white text-xl">📊</span>
+                      </div>
+                      <h3 className="text-xl font-bold text-white">ส่งออกรายงาน</h3>
+                    </div>
+                    <button
+                      onClick={() => setShowExportModal(false)}
+                      className="w-8 h-8 bg-white/20 hover:bg-white/30 rounded-lg flex items-center justify-center text-white transition-colors duration-200"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                </div>
+
+                <div className="bg-white dark:bg-gray-800 px-6 py-6">
+                  <div className="space-y-4">
+                    <div className="p-4 bg-blue-50 dark:bg-blue-900/30 rounded-xl">
+                      <h4 className="font-semibold text-blue-800 dark:text-blue-200 mb-2">
+                        รายงานที่จะส่งออก
+                      </h4>
+                      <ul className="text-sm text-blue-700 dark:text-blue-300 space-y-1">
+                        <li>• สรุปรายรับ-จ่าย ({selectedPeriod === 'month' ? 'รายเดือน' : selectedPeriod === 'week' ? 'รายสัปดาห์' : 'รายปี'})</li>
+                        <li>• การใช้จ่ายตามหมวดหมู่</li>
+                        <li>• ความคืบหน้าเป้าหมาย</li>
+                        <li>• คะแนนสุขภาพทางการเงิน</li>
+                        <li>• แนวโน้มและวิเคราะห์</li>
+                      </ul>
+                    </div>
+                    
+                    <div className="text-center">
+                      <p className="text-sm text-gray-600 dark:text-gray-400">
+                        รายงานจะถูกส่งออกในรูปแบบ JSON สำหรับการประมวลผลเพิ่มเติม
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-gradient-to-r from-gray-50/80 to-gray-100/80 dark:from-gray-700/80 dark:to-gray-800/80 px-6 py-4 border-t border-gray-200/50 dark:border-gray-600/50">
+                  <div className="flex space-x-4">
+                    <button
+                      onClick={() => setShowExportModal(false)}
+                      className="flex-1 px-6 py-3 border-2 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-700 transition-all duration-200 font-medium"
+                    >
+                      ยกเลิก
+                    </button>
+                    <button
+                      onClick={handleExportPDF}
+                      disabled={isExporting}
+                      className="flex-1 px-6 py-3 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 disabled:from-gray-400 disabled:to-gray-500 text-white rounded-xl transition-all duration-200 font-medium disabled:cursor-not-allowed"
+                    >
+                      {isExporting ? 'กำลังส่งออก...' : 'ส่งออกรายงาน'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Create Goal Modal */}
+        {showGoalModal && (
+          <div className="fixed inset-0 z-50 overflow-y-auto">
+            <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+              <div 
+                className="fixed inset-0 transition-opacity backdrop-blur-sm" 
+                onClick={() => setShowGoalModal(false)}
+              >
+                <div className="absolute inset-0 bg-gray-900/80 dark:bg-black/80"></div>
+              </div>
+
+              <div className="inline-block align-bottom bg-white dark:bg-gray-800 rounded-2xl text-left overflow-hidden shadow-2xl transform transition-all sm:my-8 sm:align-middle sm:max-w-md sm:w-full relative z-10 border border-gray-200 dark:border-gray-700">
+                <div className="relative bg-gradient-to-r from-purple-500 to-indigo-600 px-6 py-4">
+                  <div className="absolute inset-0 bg-white/10 backdrop-blur-sm"></div>
+                  <div className="relative flex items-center justify-between">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
+                        <span className="text-white text-xl">🎯</span>
+                      </div>
+                      <h3 className="text-xl font-bold text-white">ตั้งเป้าหมายใหม่</h3>
+                    </div>
+                    <button
+                      onClick={() => setShowGoalModal(false)}
+                      className="w-8 h-8 bg-white/20 hover:bg-white/30 rounded-lg flex items-center justify-center text-white transition-colors duration-200"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                </div>
+
+                <div className="bg-white dark:bg-gray-800 px-6 py-6">
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        ชื่อเป้าหมาย
+                      </label>
+                      <input
+                        type="text"
+                        value={newGoal.name}
+                        onChange={(e) => setNewGoal({...newGoal, name: e.target.value})}
+                        className="w-full px-4 py-3 border border-gray-200 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all duration-200 dark:bg-gray-700 dark:text-white"
+                        placeholder="เช่น MacBook ใหม่"
+                      />
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        จำนวนเป้าหมาย (บาท)
+                      </label>
+                      <input
+                        type="number"
+                        value={newGoal.target}
+                        onChange={(e) => setNewGoal({...newGoal, target: e.target.value})}
+                        className="w-full px-4 py-3 border border-gray-200 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all duration-200 dark:bg-gray-700 dark:text-white"
+                        placeholder="50000"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        หมวดหมู่
+                      </label>
+                      <select
+                        value={newGoal.category}
+                        onChange={(e) => setNewGoal({...newGoal, category: e.target.value})}
+                        className="w-full px-4 py-3 border border-gray-200 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all duration-200 dark:bg-gray-700 dark:text-white"
+                      >
+                        <option value="saving">การออม</option>
+                        <option value="travel">ท่องเที่ยว</option>
+                        <option value="gadget">อุปกรณ์</option>
+                        <option value="education">การศึกษา</option>
+                        <option value="health">สุขภาพ</option>
+                        <option value="other">อื่นๆ</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        วันที่เป้าหมาย
+                      </label>
+                      <input
+                        type="date"
+                        value={newGoal.deadline}
+                        onChange={(e) => setNewGoal({...newGoal, deadline: e.target.value})}
+                        className="w-full px-4 py-3 border border-gray-200 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all duration-200 dark:bg-gray-700 dark:text-white"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-gradient-to-r from-gray-50/80 to-gray-100/80 dark:from-gray-700/80 dark:to-gray-800/80 px-6 py-4 border-t border-gray-200/50 dark:border-gray-600/50">
+                  <div className="flex space-x-4">
+                    <button
+                      onClick={() => setShowGoalModal(false)}
+                      className="flex-1 px-6 py-3 border-2 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-700 transition-all duration-200 font-medium"
+                    >
+                      ยกเลิก
+                    </button>
+                    <button
+                      onClick={handleCreateGoal}
+                      disabled={isExporting}
+                      className="flex-1 px-6 py-3 bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-600 hover:to-indigo-700 disabled:from-gray-400 disabled:to-gray-500 text-white rounded-xl transition-all duration-200 font-medium disabled:cursor-not-allowed"
+                    >
+                      {isExporting ? 'กำลังสร้าง...' : 'สร้างเป้าหมาย'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Advice Modal */}
+        {showAdviceModal && (
+          <div className="fixed inset-0 z-50 overflow-y-auto">
+            <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+              <div 
+                className="fixed inset-0 transition-opacity backdrop-blur-sm" 
+                onClick={() => setShowAdviceModal(false)}
+              >
+                <div className="absolute inset-0 bg-gray-900/80 dark:bg-black/80"></div>
+              </div>
+
+              <div className="inline-block align-bottom bg-white dark:bg-gray-800 rounded-2xl text-left overflow-hidden shadow-2xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full relative z-10 border border-gray-200 dark:border-gray-700">
+                <div className="relative bg-gradient-to-r from-orange-500 to-red-500 px-6 py-4">
+                  <div className="absolute inset-0 bg-white/10 backdrop-blur-sm"></div>
+                  <div className="relative flex items-center justify-between">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
+                        <span className="text-white text-xl">💡</span>
+                      </div>
+                      <h3 className="text-xl font-bold text-white">คำแนะนำทางการเงิน</h3>
+                    </div>
+                    <button
+                      onClick={() => setShowAdviceModal(false)}
+                      className="w-8 h-8 bg-white/20 hover:bg-white/30 rounded-lg flex items-center justify-center text-white transition-colors duration-200"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                </div>
+
+                <div className="bg-white dark:bg-gray-800 px-6 py-6">
+                  <div className="space-y-4">
+                    <div className="text-center">
+                      <div className="w-16 h-16 bg-orange-100 dark:bg-orange-900 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <span className="text-orange-600 dark:text-orange-400 text-2xl">🧠</span>
+                      </div>
+                      <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+                        คำแนะนำเฉพาะสำหรับคุณ
+                      </h4>
+                      <p className="text-gray-600 dark:text-gray-400 text-sm mb-4">
+                        จากการวิเคราะห์พฤติกรรมการใช้จ่ายของคุณ
+                      </p>
+                    </div>
+
+                    <div className="space-y-3">
+                      {generateAdvice().map((advice, index) => (
+                        <div key={index} className="p-3 bg-gradient-to-r from-orange-50 to-yellow-50 dark:from-orange-900/30 dark:to-yellow-900/30 rounded-lg border border-orange-200 dark:border-orange-700">
+                          <p className="text-sm text-orange-800 dark:text-orange-200">
+                            {advice}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="p-4 bg-blue-50 dark:bg-blue-900/30 rounded-lg border border-blue-200 dark:border-blue-700">
+                      <h5 className="font-semibold text-blue-800 dark:text-blue-200 mb-2">
+                        🎯 เป้าหมายสำหรับเดือนหน้า
+                      </h5>
+                      <ul className="text-sm text-blue-700 dark:text-blue-300 space-y-1">
+                        <li>• ลดการใช้จ่ายในหมวด "อาหาร" ลง 10%</li>
+                        <li>• เพิ่มการออมให้ได้ ฿{Math.round(totalIncome * 0.05 / mockMonthlyData.length)} เพิ่มเติม</li>
+                        <li>• ติดตามรายจ่ายทุกวันเป็นเวลา 1 สัปดาห์</li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-gradient-to-r from-gray-50/80 to-gray-100/80 dark:from-gray-700/80 dark:to-gray-800/80 px-6 py-4 border-t border-gray-200/50 dark:border-gray-600/50">
+                  <button
+                    onClick={() => setShowAdviceModal(false)}
+                    className="w-full px-6 py-3 bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white rounded-xl transition-all duration-200 font-medium"
+                  >
+                    เข้าใจแล้ว ขอบคุณ!
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </DashboardLayout>
   );

@@ -7,6 +7,15 @@ export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState<'profile' | 'security' | 'notifications' | 'preferences'>('profile');
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [showSuccessMessage, setShowSuccessMessage] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [showChangePasswordModal, setShowChangePasswordModal] = useState(false);
+  const [passwordData, setPasswordData] = useState({
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: ''
+  });
+  const [twoFactorEnabled, setTwoFactorEnabled] = useState(false);
 
   // Mock user data - ในอนาคตจะเชื่อมกับ API
   const [userData, setUserData] = useState({
@@ -43,7 +52,122 @@ export default function SettingsPage() {
     await new Promise(resolve => setTimeout(resolve, 1500));
     setIsSaving(false);
     setIsEditing(false);
-    // Show success message
+    setShowSuccessMessage(true);
+    setTimeout(() => setShowSuccessMessage(false), 3000);
+  };
+
+  const handleChangePassword = async () => {
+    if (!passwordData.currentPassword || !passwordData.newPassword || !passwordData.confirmPassword) {
+      alert('กรุณากรอกข้อมูลให้ครบถ้วน');
+      return;
+    }
+    
+    if (passwordData.newPassword !== passwordData.confirmPassword) {
+      alert('รหัสผ่านใหม่ไม่ตรงกัน');
+      return;
+    }
+
+    if (passwordData.newPassword.length < 6) {
+      alert('รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร');
+      return;
+    }
+
+    setIsSaving(true);
+    // Simulate API call
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    setIsSaving(false);
+    setShowChangePasswordModal(false);
+    setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
+    setShowSuccessMessage(true);
+    setTimeout(() => setShowSuccessMessage(false), 3000);
+  };
+
+  const handleToggleTwoFactor = async () => {
+    setIsSaving(true);
+    // Simulate API call
+    await new Promise(resolve => setTimeout(resolve, 1500));
+    setTwoFactorEnabled(!twoFactorEnabled);
+    setIsSaving(false);
+    setShowSuccessMessage(true);
+    setTimeout(() => setShowSuccessMessage(false), 3000);
+  };
+
+  const handleExportData = () => {
+    // Simulate data export
+    const data = {
+      profile: userData,
+      notifications: notificationSettings,
+      preferences: appPreferences,
+      exportDate: new Date().toISOString()
+    };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `krapao-share-data-${new Date().toISOString().split('T')[0]}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const handleClearCache = async () => {
+    if (confirm('คุณแน่ใจหรือไม่ที่จะล้างข้อมูลแคช? การกระทำนี้จะลบข้อมูลที่เก็บไว้ชั่วคราว')) {
+      setIsSaving(true);
+      // Simulate cache clearing
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      if ('caches' in window) {
+        const cacheNames = await caches.keys();
+        await Promise.all(cacheNames.map(name => caches.delete(name)));
+      }
+      // Clear localStorage
+      localStorage.clear();
+      setIsSaving(false);
+      setShowSuccessMessage(true);
+      setTimeout(() => setShowSuccessMessage(false), 3000);
+    }
+  };
+
+  const handleDeleteAccount = () => {
+    setShowDeleteModal(true);
+  };
+
+  const confirmDeleteAccount = async () => {
+    setIsSaving(true);
+    // Simulate account deletion
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    setIsSaving(false);
+    setShowDeleteModal(false);
+    alert('บัญชีของคุณได้ถูกลบแล้ว');
+    // In real app, redirect to login or home page
+  };
+
+  const handleRevokeSession = async (sessionIndex: number) => {
+    if (confirm('คุณแน่ใจหรือไม่ที่จะยกเลิกเซสชันนี้?')) {
+      setIsSaving(true);
+      // Simulate session revocation
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      setIsSaving(false);
+      setShowSuccessMessage(true);
+      setTimeout(() => setShowSuccessMessage(false), 3000);
+    }
+  };
+
+  const handleProfileImageUpload = () => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.onchange = (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          setUserData({ ...userData, profileImage: e.target?.result as string });
+        };
+        reader.readAsDataURL(file);
+      }
+    };
+    input.click();
   };
 
   const tabs = [
@@ -93,7 +217,15 @@ export default function SettingsPage() {
           <div className="lg:col-span-3">
             <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
               
-              {/* Profile Tab */}
+              {/* Success Message */}
+      {showSuccessMessage && (
+        <div className="fixed top-4 right-4 z-50 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg flex items-center space-x-2 animate-slide-in">
+          <span className="text-lg">✅</span>
+          <span className="font-medium">บันทึกข้อมูลสำเร็จ!</span>
+        </div>
+      )}
+
+      {/* Profile Tab */}
               {activeTab === 'profile' && (
                 <div className="p-6">
                   <div className="flex items-center justify-between mb-6">
@@ -150,7 +282,11 @@ export default function SettingsPage() {
                         )}
                       </div>
                       {isEditing && (
-                        <button className="absolute -bottom-1 -right-1 w-7 h-7 bg-gray-900 dark:bg-white text-white dark:text-gray-900 rounded-full flex items-center justify-center text-xs hover:bg-gray-800 dark:hover:bg-gray-100 transition-colors">
+                        <button 
+                          onClick={handleProfileImageUpload}
+                          className="absolute -bottom-1 -right-1 w-7 h-7 bg-gray-900 dark:bg-white text-white dark:text-gray-900 rounded-full flex items-center justify-center text-xs hover:bg-gray-800 dark:hover:bg-gray-100 transition-colors"
+                          title="เปลี่ยนรูปโปรไฟล์"
+                        >
                           ✏️
                         </button>
                       )}
@@ -307,7 +443,10 @@ export default function SettingsPage() {
                             className="w-full px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white font-light focus:ring-2 focus:ring-gray-200 dark:focus:ring-gray-600 focus:border-transparent transition-colors"
                           />
                         </div>
-                        <button className="px-4 py-2 text-sm font-light bg-gray-900 dark:bg-white text-white dark:text-gray-900 rounded-lg hover:bg-gray-800 dark:hover:bg-gray-100 transition-colors">
+                        <button 
+                          onClick={() => setShowChangePasswordModal(true)}
+                          className="px-4 py-2 text-sm font-light bg-gray-900 dark:bg-white text-white dark:text-gray-900 rounded-lg hover:bg-gray-800 dark:hover:bg-gray-100 transition-colors"
+                        >
                           เปลี่ยนรหัสผ่าน
                         </button>
                       </div>
@@ -324,8 +463,16 @@ export default function SettingsPage() {
                             เพิ่มความปลอดภัยให้กับบัญชีของคุณ
                           </p>
                         </div>
-                        <button className="px-4 py-2 text-sm font-light border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
-                          เปิดใช้งาน
+                        <button 
+                          onClick={handleToggleTwoFactor}
+                          disabled={isSaving}
+                          className={`px-4 py-2 text-sm font-light border rounded-lg transition-colors ${
+                            twoFactorEnabled 
+                              ? 'border-red-200 dark:border-red-700 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20' 
+                              : 'border-green-200 dark:border-green-700 text-green-600 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/20'
+                          } disabled:opacity-50`}
+                        >
+                          {isSaving ? 'กำลังประมวลผล...' : twoFactorEnabled ? 'ปิดใช้งาน' : 'เปิดใช้งาน'}
                         </button>
                       </div>
                     </div>
@@ -356,8 +503,12 @@ export default function SettingsPage() {
                               </p>
                             </div>
                             {!session.current && (
-                              <button className="text-xs text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 font-light">
-                                ยกเลิก
+                              <button 
+                                onClick={() => handleRevokeSession(index)}
+                                disabled={isSaving}
+                                className="text-xs text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 font-light disabled:opacity-50"
+                              >
+                                {isSaving ? 'กำลังยกเลิก...' : 'ยกเลิก'}
                               </button>
                             )}
                           </div>
@@ -510,15 +661,25 @@ export default function SettingsPage() {
                         การจัดการข้อมูล
                       </h3>
                       <div className="space-y-3">
-                        <button className="w-full px-4 py-2 text-sm font-light border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors text-left">
-                          📤 ส่งออกข้อมูล
-                        </button>
-                        <button className="w-full px-4 py-2 text-sm font-light border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors text-left">
-                          🗑️ ล้างข้อมูลแคช
-                        </button>
-                        <button className="w-full px-4 py-2 text-sm font-light border border-red-200 dark:border-red-700 text-red-600 dark:text-red-400 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors text-left">
-                          ⚠️ ลบบัญชี
-                        </button>
+                      <button 
+                        onClick={handleExportData}
+                        className="w-full px-4 py-2 text-sm font-light border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors text-left"
+                      >
+                        📤 ส่งออกข้อมูล
+                      </button>
+                      <button 
+                        onClick={handleClearCache}
+                        disabled={isSaving}
+                        className="w-full px-4 py-2 text-sm font-light border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors text-left disabled:opacity-50"
+                      >
+                        🗑️ {isSaving ? 'กำลังล้าง...' : 'ล้างข้อมูลแคช'}
+                      </button>
+                      <button 
+                        onClick={handleDeleteAccount}
+                        className="w-full px-4 py-2 text-sm font-light border border-red-200 dark:border-red-700 text-red-600 dark:text-red-400 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors text-left"
+                      >
+                        ⚠️ ลบบัญชี
+                      </button>
                       </div>
                     </div>
                   </div>
@@ -527,6 +688,179 @@ export default function SettingsPage() {
             </div>
           </div>
         </div>
+
+        {/* Change Password Modal */}
+        {showChangePasswordModal && (
+          <div className="fixed inset-0 z-50 overflow-y-auto">
+            <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+              <div 
+                className="fixed inset-0 transition-opacity backdrop-blur-sm" 
+                onClick={() => setShowChangePasswordModal(false)}
+              >
+                <div className="absolute inset-0 bg-gray-900/80 dark:bg-black/80"></div>
+              </div>
+
+              <div className="inline-block align-bottom bg-white dark:bg-gray-800 rounded-2xl text-left overflow-hidden shadow-2xl transform transition-all sm:my-8 sm:align-middle sm:max-w-md sm:w-full relative z-10 border border-gray-200 dark:border-gray-700">
+                {/* Header */}
+                <div className="relative bg-gradient-to-r from-blue-500 to-indigo-600 px-6 py-4">
+                  <div className="absolute inset-0 bg-white/10 backdrop-blur-sm"></div>
+                  <div className="relative flex items-center justify-between">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
+                        <span className="text-white text-xl">🔒</span>
+                      </div>
+                      <h3 className="text-xl font-bold text-white">
+                        เปลี่ยนรหัสผ่าน
+                      </h3>
+                    </div>
+                    <button
+                      onClick={() => setShowChangePasswordModal(false)}
+                      className="w-8 h-8 bg-white/20 hover:bg-white/30 rounded-lg flex items-center justify-center text-white transition-colors duration-200"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                </div>
+
+                <div className="bg-white dark:bg-gray-800 px-6 py-6">
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        รหัสผ่านปัจจุบัน
+                      </label>
+                      <input
+                        type="password"
+                        value={passwordData.currentPassword}
+                        onChange={(e) => setPasswordData({...passwordData, currentPassword: e.target.value})}
+                        className="w-full px-4 py-3 border border-gray-200 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 dark:bg-gray-700 dark:text-white"
+                        placeholder="กรอกรหัสผ่านปัจจุบัน"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        รหัสผ่านใหม่
+                      </label>
+                      <input
+                        type="password"
+                        value={passwordData.newPassword}
+                        onChange={(e) => setPasswordData({...passwordData, newPassword: e.target.value})}
+                        className="w-full px-4 py-3 border border-gray-200 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 dark:bg-gray-700 dark:text-white"
+                        placeholder="กรอกรหัสผ่านใหม่"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        ยืนยันรหัสผ่านใหม่
+                      </label>
+                      <input
+                        type="password"
+                        value={passwordData.confirmPassword}
+                        onChange={(e) => setPasswordData({...passwordData, confirmPassword: e.target.value})}
+                        className="w-full px-4 py-3 border border-gray-200 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 dark:bg-gray-700 dark:text-white"
+                        placeholder="ยืนยันรหัสผ่านใหม่"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-gradient-to-r from-gray-50/80 to-gray-100/80 dark:from-gray-700/80 dark:to-gray-800/80 px-6 py-4 border-t border-gray-200/50 dark:border-gray-600/50">
+                  <div className="flex space-x-4">
+                    <button
+                      onClick={() => setShowChangePasswordModal(false)}
+                      className="flex-1 px-6 py-3 border-2 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-700 transition-all duration-200 font-medium"
+                    >
+                      ยกเลิก
+                    </button>
+                    <button
+                      onClick={handleChangePassword}
+                      disabled={isSaving}
+                      className="flex-1 px-6 py-3 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 disabled:from-gray-400 disabled:to-gray-500 text-white rounded-xl transition-all duration-200 font-medium disabled:cursor-not-allowed"
+                    >
+                      {isSaving ? 'กำลังเปลี่ยน...' : 'เปลี่ยนรหัสผ่าน'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Delete Account Modal */}
+        {showDeleteModal && (
+          <div className="fixed inset-0 z-50 overflow-y-auto">
+            <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+              <div 
+                className="fixed inset-0 transition-opacity backdrop-blur-sm" 
+                onClick={() => setShowDeleteModal(false)}
+              >
+                <div className="absolute inset-0 bg-gray-900/80 dark:bg-black/80"></div>
+              </div>
+
+              <div className="inline-block align-bottom bg-white dark:bg-gray-800 rounded-2xl text-left overflow-hidden shadow-2xl transform transition-all sm:my-8 sm:align-middle sm:max-w-md sm:w-full relative z-10 border border-red-200 dark:border-red-700">
+                {/* Header */}
+                <div className="relative bg-gradient-to-r from-red-500 to-red-600 px-6 py-4">
+                  <div className="absolute inset-0 bg-white/10 backdrop-blur-sm"></div>
+                  <div className="relative flex items-center justify-between">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
+                        <span className="text-white text-xl">⚠️</span>
+                      </div>
+                      <h3 className="text-xl font-bold text-white">
+                        ลบบัญชี
+                      </h3>
+                    </div>
+                    <button
+                      onClick={() => setShowDeleteModal(false)}
+                      className="w-8 h-8 bg-white/20 hover:bg-white/30 rounded-lg flex items-center justify-center text-white transition-colors duration-200"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                </div>
+
+                <div className="bg-white dark:bg-gray-800 px-6 py-6">
+                  <div className="text-center">
+                    <div className="w-16 h-16 bg-red-100 dark:bg-red-900 rounded-full flex items-center justify-center mx-auto mb-4">
+                      <span className="text-red-600 dark:text-red-400 text-2xl">⚠️</span>
+                    </div>
+                    <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+                      คุณแน่ใจหรือไม่?
+                    </h4>
+                    <p className="text-gray-600 dark:text-gray-400 mb-4">
+                      การลบบัญชีนี้จะไม่สามารถยกเลิกได้ ข้อมูลทั้งหมดของคุณจะถูกลบอย่างถาวร
+                    </p>
+                    <div className="bg-red-50 dark:bg-red-900/30 p-4 rounded-lg">
+                      <p className="text-sm text-red-700 dark:text-red-300">
+                        • ข้อมูลส่วนตัวทั้งหมด<br />
+                        • ประวัติการทำธุรกรรม<br />
+                        • เป้าหมายการออมและงบประมาณ<br />
+                        • การตั้งค่าและคำแนะนำ
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-gradient-to-r from-gray-50/80 to-gray-100/80 dark:from-gray-700/80 dark:to-gray-800/80 px-6 py-4 border-t border-gray-200/50 dark:border-gray-600/50">
+                  <div className="flex space-x-4">
+                    <button
+                      onClick={() => setShowDeleteModal(false)}
+                      className="flex-1 px-6 py-3 border-2 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-700 transition-all duration-200 font-medium"
+                    >
+                      ยกเลิก
+                    </button>
+                    <button
+                      onClick={confirmDeleteAccount}
+                      disabled={isSaving}
+                      className="flex-1 px-6 py-3 bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 disabled:from-gray-400 disabled:to-gray-500 text-white rounded-xl transition-all duration-200 font-medium disabled:cursor-not-allowed"
+                    >
+                      {isSaving ? 'กำลังลบ...' : 'ลบบัญชีถาวร'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </DashboardLayout>
   );
