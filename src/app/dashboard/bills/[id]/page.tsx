@@ -29,6 +29,8 @@ interface EditingBill {
   totalAmount: string;
   description: string;
   members: string[];
+  memberAmounts: { [key: string]: number };
+  splitType: 'equal' | 'custom';
 }
 
 interface PaymentHistoryItem {
@@ -217,7 +219,12 @@ export default function BillDetailPage({ params }: PageProps) {
       title: bill.title,
       totalAmount: bill.totalAmount.toString(),
       description: bill.description,
-      members: bill.members.filter(m => m.name !== 'คุณ').map(m => m.name)
+      members: bill.members.filter(m => m.name !== 'คุณ').map(m => m.name),
+      memberAmounts: bill.members.reduce((acc, m) => {
+        acc[m.name] = m.amount;
+        return acc;
+      }, {} as { [key: string]: number }),
+      splitType: 'custom'
     });
     setShowEditModal(true);
   };
@@ -230,7 +237,34 @@ export default function BillDetailPage({ params }: PageProps) {
 
     const validMembers = editingBill.members.filter(m => m.trim());
     const totalAmount = parseFloat(editingBill.totalAmount);
-    const amountPerPerson = totalAmount / (validMembers.length + 1);
+
+    let newMembers: BillMember[];
+
+    if (editingBill.splitType === 'equal') {
+      // หารเท่าๆ กัน
+      const amountPerPerson = totalAmount / (validMembers.length + 1);
+      newMembers = [
+        { name: 'คุณ', amount: amountPerPerson, paid: true },
+        ...validMembers.map(member => ({ 
+          name: member, 
+          amount: amountPerPerson, 
+          paid: bill?.members.find(m => m.name === member)?.paid || false 
+        }))
+      ];
+    } else {
+      // กำหนดจำนวนเองแต่ละคน
+      const memberAmountsSum = Object.values(editingBill.memberAmounts).reduce((sum, amount) => sum + amount, 0);
+      if (Math.abs(memberAmountsSum - totalAmount) > 0.01) {
+        alert(`ยอดรวมไม่ตรงกัน! ยอดที่กรอก: ฿${memberAmountsSum.toLocaleString()} ยอดรวมที่ระบุ: ฿${totalAmount.toLocaleString()}`);
+        return;
+      }
+
+      newMembers = Object.entries(editingBill.memberAmounts).map(([name, amount]) => ({
+        name,
+        amount,
+        paid: bill?.members.find(m => m.name === name)?.paid || false
+      }));
+    }
 
     setBill(prev => {
       if (!prev) return null;
@@ -239,14 +273,7 @@ export default function BillDetailPage({ params }: PageProps) {
         title: editingBill.title,
         totalAmount: totalAmount,
         description: editingBill.description,
-        members: [
-          { name: 'คุณ', amount: amountPerPerson, paid: true },
-          ...validMembers.map(member => ({ 
-            name: member, 
-            amount: amountPerPerson, 
-            paid: prev.members.find(m => m.name === member)?.paid || false 
-          }))
-        ]
+        members: newMembers
       };
     });
 
@@ -1120,7 +1147,7 @@ export default function BillDetailPage({ params }: PageProps) {
                     </button>
                   </div>
                   
-                  <div className="space-y-4">
+                  <div className="space-y-6">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                         ชื่อบิล *
@@ -1129,7 +1156,7 @@ export default function BillDetailPage({ params }: PageProps) {
                         type="text"
                         value={editingBill.title}
                         onChange={(e) => setEditingBill(prev => prev ? {...prev, title: e.target.value} : null)}
-                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
                         required
                       />
                     </div>
@@ -1143,8 +1170,26 @@ export default function BillDetailPage({ params }: PageProps) {
                         <input
                           type="number"
                           value={editingBill.totalAmount}
-                          onChange={(e) => setEditingBill(prev => prev ? {...prev, totalAmount: e.target.value} : null)}
-                          className="w-full pl-8 pr-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                          onChange={(e) => {
+                            const newTotal = parseFloat(e.target.value) || 0;
+                            setEditingBill(prev => {
+                              if (!prev) return null;
+                              
+                              // ถ้าเป็นการหารเท่าๆ กัน ให้อัปเดตจำนวนเงินของทุกคนอัตโนมัติ
+                              if (prev.splitType === 'equal') {
+                                const totalMembers = prev.members.length + 1; // +1 สำหรับตัวเอง
+                                const amountPerPerson = newTotal / totalMembers;
+                                const newMemberAmounts: { [key: string]: number } = { 'คุณ': amountPerPerson };
+                                prev.members.forEach(member => {
+                                  newMemberAmounts[member] = amountPerPerson;
+                                });
+                                return { ...prev, totalAmount: e.target.value, memberAmounts: newMemberAmounts };
+                              }
+                              
+                              return { ...prev, totalAmount: e.target.value };
+                            });
+                          }}
+                          className="w-full pl-8 pr-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
                           min="0"
                           step="0.01"
                           required
@@ -1159,17 +1204,174 @@ export default function BillDetailPage({ params }: PageProps) {
                       <textarea
                         value={editingBill.description}
                         onChange={(e) => setEditingBill(prev => prev ? {...prev, description: e.target.value} : null)}
-                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
                         rows={3}
                       />
                     </div>
+
+                    {/* การแบ่งจ่าย */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+                        วิธีการแบ่งจ่าย
+                      </label>
+                      <div className="grid grid-cols-2 gap-4">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const totalAmount = parseFloat(editingBill.totalAmount) || 0;
+                            const totalMembers = editingBill.members.length + 1;
+                            const amountPerPerson = totalAmount / totalMembers;
+                            const newMemberAmounts: { [key: string]: number } = { 'คุณ': amountPerPerson };
+                            editingBill.members.forEach(member => {
+                              newMemberAmounts[member] = amountPerPerson;
+                            });
+                            setEditingBill(prev => prev ? { ...prev, splitType: 'equal', memberAmounts: newMemberAmounts } : null);
+                          }}
+                          className={`p-4 rounded-xl border-2 transition-all duration-300 ${
+                            editingBill.splitType === 'equal'
+                              ? 'border-blue-500 bg-blue-50 dark:bg-blue-900 text-blue-700 dark:text-blue-300'
+                              : 'border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500'
+                          }`}
+                        >
+                          <div className="text-center">
+                            <div className="text-2xl mb-2">⚖️</div>
+                            <div className="font-semibold">หารเท่าๆ กัน</div>
+                            <div className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                              แบ่งจ่ายเท่าๆ กันทุกคน
+                            </div>
+                          </div>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => setEditingBill(prev => prev ? { ...prev, splitType: 'custom' } : null)}
+                          className={`p-4 rounded-xl border-2 transition-all duration-300 ${
+                            editingBill.splitType === 'custom'
+                              ? 'border-green-500 bg-green-50 dark:bg-green-900 text-green-700 dark:text-green-300'
+                              : 'border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500'
+                          }`}
+                        >
+                          <div className="text-center">
+                            <div className="text-2xl mb-2">🎯</div>
+                            <div className="font-semibold">กำหนดเอง</div>
+                            <div className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                              ระบุจำนวนแต่ละคน
+                            </div>
+                          </div>
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* รายละเอียดการแบ่งจ่าย */}
+                    {editingBill.splitType === 'custom' && (
+                      <div className="bg-gray-50 dark:bg-gray-700 rounded-xl p-4">
+                        <h4 className="font-medium text-gray-900 dark:text-white mb-3 flex items-center space-x-2">
+                          <span>💰</span>
+                          <span>จำนวนเงินแต่ละคน</span>
+                        </h4>
+                        <div className="space-y-3">
+                          {/* ตัวเอง */}
+                          <div className="flex items-center space-x-3">
+                            <span className="w-20 text-sm font-medium text-blue-600 dark:text-blue-400">คุณ:</span>
+                            <div className="flex-1 relative">
+                              <span className="absolute left-3 top-2 text-gray-500 dark:text-gray-400 text-sm">฿</span>
+                              <input
+                                type="number"
+                                value={editingBill.memberAmounts['คุณ'] || 0}
+                                onChange={(e) => {
+                                  const amount = parseFloat(e.target.value) || 0;
+                                  setEditingBill(prev => prev ? {
+                                    ...prev,
+                                    memberAmounts: { ...prev.memberAmounts, 'คุณ': amount }
+                                  } : null);
+                                }}
+                                className="w-full pl-8 pr-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-600 dark:text-white text-sm"
+                                min="0"
+                                step="0.01"
+                              />
+                            </div>
+                          </div>
+
+                          {/* สมาชิกอื่นๆ */}
+                          {editingBill.members.map((member, index) => (
+                            <div key={index} className="flex items-center space-x-3">
+                              <span className="w-20 text-sm font-medium text-gray-700 dark:text-gray-300">{member}:</span>
+                              <div className="flex-1 relative">
+                                <span className="absolute left-3 top-2 text-gray-500 dark:text-gray-400 text-sm">฿</span>
+                                <input
+                                  type="number"
+                                  value={editingBill.memberAmounts[member] || 0}
+                                  onChange={(e) => {
+                                    const amount = parseFloat(e.target.value) || 0;
+                                    setEditingBill(prev => prev ? {
+                                      ...prev,
+                                      memberAmounts: { ...prev.memberAmounts, [member]: amount }
+                                    } : null);
+                                  }}
+                                  className="w-full pl-8 pr-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-600 dark:text-white text-sm"
+                                  min="0"
+                                  step="0.01"
+                                />
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+
+                        {/* สรุปยอด */}
+                        <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-600">
+                          <div className="flex justify-between items-center">
+                            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">ยอดรวมที่กรอก:</span>
+                            <span className={`text-lg font-bold ${
+                              Math.abs(Object.values(editingBill.memberAmounts).reduce((sum, amount) => sum + amount, 0) - (parseFloat(editingBill.totalAmount) || 0)) < 0.01
+                                ? 'text-green-600 dark:text-green-400'
+                                : 'text-red-600 dark:text-red-400'
+                            }`}>
+                              ฿{Object.values(editingBill.memberAmounts).reduce((sum, amount) => sum + amount, 0).toLocaleString()}
+                            </span>
+                          </div>
+                          <div className="flex justify-between items-center mt-1">
+                            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">ยอดรวมที่ระบุ:</span>
+                            <span className="text-lg font-bold text-gray-900 dark:text-white">
+                              ฿{(parseFloat(editingBill.totalAmount) || 0).toLocaleString()}
+                            </span>
+                          </div>
+                          {Math.abs(Object.values(editingBill.memberAmounts).reduce((sum, amount) => sum + amount, 0) - (parseFloat(editingBill.totalAmount) || 0)) >= 0.01 && (
+                            <div className="mt-2 p-2 bg-red-100 dark:bg-red-900 border border-red-300 dark:border-red-700 rounded-lg">
+                              <p className="text-sm text-red-700 dark:text-red-300 flex items-center space-x-2">
+                                <span>⚠️</span>
+                                <span>ยอดรวมไม่ตรงกัน! กรุณาปรับแก้ให้ถูกต้อง</span>
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {editingBill.splitType === 'equal' && (
+                      <div className="bg-blue-50 dark:bg-blue-900 rounded-xl p-4">
+                        <h4 className="font-medium text-blue-800 dark:text-blue-200 mb-2 flex items-center space-x-2">
+                          <span>⚖️</span>
+                          <span>การแบ่งจ่ายเท่าๆ กัน</span>
+                        </h4>
+                        <div className="text-sm text-blue-700 dark:text-blue-300">
+                          <p>จำนวนสมาชิก: {editingBill.members.length + 1} คน</p>
+                          <p>จำนวนเงินต่อคน: <span className="font-semibold">฿{((parseFloat(editingBill.totalAmount) || 0) / (editingBill.members.length + 1)).toLocaleString()}</span></p>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
 
                 <div className="bg-gray-50 dark:bg-gray-700 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse gap-3">
                   <button
                     onClick={handleUpdateBill}
-                    disabled={!editingBill.title || !editingBill.totalAmount}
+                    disabled={
+                      !editingBill.title || 
+                      !editingBill.totalAmount || 
+                      (editingBill.splitType === 'custom' && 
+                        Math.abs(Object.values(editingBill.memberAmounts).reduce((sum, amount) => sum + amount, 0) - (parseFloat(editingBill.totalAmount) || 0)) >= 0.01
+                      )
+                    }
                     className="w-full inline-flex justify-center rounded-lg border border-transparent shadow-sm px-4 py-2 bg-blue-600 dark:bg-blue-500 text-base font-medium text-white hover:bg-blue-700 dark:hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed sm:w-auto sm:text-sm transition-all"
                   >
                     💾 บันทึกการแก้ไข

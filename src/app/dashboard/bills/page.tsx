@@ -43,7 +43,8 @@ export default function BillsPage() {
     totalAmount: '',
     description: '',
     members: [''],
-    splitType: 'equal' as 'equal' | 'custom'
+    splitType: 'equal' as 'equal' | 'custom',
+    memberAmounts: {} as { [key: string]: number }
   });
 
   const itemsPerPage = 4;
@@ -129,7 +130,30 @@ export default function BillsPage() {
 
     const validMembers = newBill.members.filter(m => m.trim());
     const totalAmount = parseFloat(newBill.totalAmount);
-    const amountPerPerson = totalAmount / (validMembers.length + 1); // +1 for "คุณ"
+
+    let newMembers: BillMember[];
+
+    if (newBill.splitType === 'equal') {
+      // หารเท่าๆ กัน
+      const amountPerPerson = totalAmount / (validMembers.length + 1); // +1 for "คุณ"
+      newMembers = [
+        { name: 'คุณ', amount: amountPerPerson, paid: true },
+        ...validMembers.map(member => ({ name: member, amount: amountPerPerson, paid: false }))
+      ];
+    } else {
+      // กำหนดจำนวนเองแต่ละคน
+      const memberAmountsSum = Object.values(newBill.memberAmounts).reduce((sum, amount) => sum + amount, 0);
+      if (Math.abs(memberAmountsSum - totalAmount) > 0.01) {
+        alert(`ยอดรวมไม่ตรงกัน! ยอดที่กรอก: ฿${memberAmountsSum.toLocaleString()} ยอดรวมที่ระบุ: ฿${totalAmount.toLocaleString()}`);
+        return;
+      }
+
+      newMembers = Object.entries(newBill.memberAmounts).map(([name, amount]) => ({
+        name,
+        amount,
+        paid: name === 'คุณ'
+      }));
+    }
 
     const newId = Math.max(...[...mockActiveBills, ...mockSettledBills].map(bill => bill.id)) + 1;
     const newBillData = {
@@ -139,10 +163,7 @@ export default function BillsPage() {
       description: newBill.description,
       createdBy: 'คุณ',
       createdAt: new Date().toISOString().split('T')[0],
-      members: [
-        { name: 'คุณ', amount: amountPerPerson, paid: true },
-        ...validMembers.map(member => ({ name: member, amount: amountPerPerson, paid: false }))
-      ],
+      members: newMembers,
       status: 'active' as const
     };
 
@@ -153,7 +174,8 @@ export default function BillsPage() {
       totalAmount: '',
       description: '',
       members: [''],
-      splitType: 'equal'
+      splitType: 'equal',
+      memberAmounts: {}
     });
     setCurrentPage(1);
   };
@@ -166,16 +188,58 @@ export default function BillsPage() {
   };
 
   const updateMember = (index: number, value: string) => {
-    setNewBill(prev => ({
-      ...prev,
-      members: prev.members.map((member, i) => i === index ? value : member)
-    }));
+    setNewBill(prev => {
+      const oldName = prev.members[index];
+      const newMembers = prev.members.map((member, i) => i === index ? value : member);
+      
+      // Update memberAmounts if we have custom splitting
+      if (prev.splitType === 'custom') {
+        const newMemberAmounts = { ...prev.memberAmounts };
+        if (oldName && oldName !== value) {
+          // Remove old name and add new name with same amount or 0
+          const amount = newMemberAmounts[oldName] || 0;
+          delete newMemberAmounts[oldName];
+          if (value.trim()) {
+            newMemberAmounts[value] = amount;
+          }
+        }
+        return {
+          ...prev,
+          members: newMembers,
+          memberAmounts: newMemberAmounts
+        };
+      }
+      
+      return {
+        ...prev,
+        members: newMembers
+      };
+    });
   };
 
   const removeMember = (index: number) => {
+    setNewBill(prev => {
+      const memberToRemove = prev.members[index];
+      const newMemberAmounts = { ...prev.memberAmounts };
+      if (memberToRemove) {
+        delete newMemberAmounts[memberToRemove];
+      }
+      
+      return {
+        ...prev,
+        members: prev.members.filter((_, i) => i !== index),
+        memberAmounts: newMemberAmounts
+      };
+    });
+  };
+
+  const updateMemberAmount = (memberName: string, amount: number) => {
     setNewBill(prev => ({
       ...prev,
-      members: prev.members.filter((_, i) => i !== index)
+      memberAmounts: {
+        ...prev.memberAmounts,
+        [memberName]: amount
+      }
     }));
   };
 
@@ -611,7 +675,7 @@ export default function BillsPage() {
                       </label>
                       <div className="flex space-x-4">
                         <button
-                          onClick={() => setNewBill(prev => ({...prev, splitType: 'equal'}))}
+                          onClick={() => setNewBill(prev => ({...prev, splitType: 'equal', memberAmounts: {}}))}
                           className={`flex-1 py-2 px-4 rounded-lg border ${
                             newBill.splitType === 'equal'
                               ? 'bg-blue-50 dark:bg-blue-900 border-blue-300 dark:border-blue-700 text-blue-700 dark:text-blue-300'
@@ -621,7 +685,26 @@ export default function BillsPage() {
                           แบ่งเท่าๆ กัน
                         </button>
                         <button
-                          onClick={() => setNewBill(prev => ({...prev, splitType: 'custom'}))}
+                          onClick={() => {
+                            setNewBill(prev => {
+                              const validMembers = prev.members.filter(m => m.trim());
+                              const totalAmount = parseFloat(prev.totalAmount) || 0;
+                              const amountPerPerson = totalAmount / (validMembers.length + 1);
+                              
+                              // Initialize memberAmounts with equal split
+                              const initialAmounts: { [key: string]: number } = {};
+                              initialAmounts['คุณ'] = amountPerPerson;
+                              validMembers.forEach(member => {
+                                initialAmounts[member] = amountPerPerson;
+                              });
+                              
+                              return {
+                                ...prev,
+                                splitType: 'custom',
+                                memberAmounts: initialAmounts
+                              };
+                            });
+                          }}
                           className={`flex-1 py-2 px-4 rounded-lg border ${
                             newBill.splitType === 'custom'
                               ? 'bg-blue-50 dark:bg-blue-900 border-blue-300 dark:border-blue-700 text-blue-700 dark:text-blue-300'
@@ -669,13 +752,134 @@ export default function BillsPage() {
                         + เพิ่มสมาชิก
                       </button>
                     </div>
+
+                    {/* Custom Amount Section */}
+                    {newBill.splitType === 'custom' && (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+                          กำหนดจำนวนเงินแต่ละคน
+                        </label>
+                        
+                        {/* คุณ */}
+                        <div className="mb-3 p-3 bg-blue-50 dark:bg-blue-900 rounded-lg">
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm font-medium text-blue-700 dark:text-blue-300">👤 คุณ</span>
+                            <div className="flex items-center space-x-2">
+                              <span className="text-sm text-blue-600 dark:text-blue-400">฿</span>
+                              <input
+                                type="number"
+                                value={newBill.memberAmounts['คุณ'] || 0}
+                                onChange={(e) => updateMemberAmount('คุณ', parseFloat(e.target.value) || 0)}
+                                className="w-24 px-2 py-1 border border-blue-300 dark:border-blue-600 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-blue-800 dark:text-blue-100 text-sm"
+                                min="0"
+                                step="0.01"
+                              />
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* เพื่อนๆ */}
+                        {newBill.members.filter(m => m.trim()).map((member, index) => (
+                          <div key={index} className="mb-3 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                            <div className="flex items-center justify-between">
+                              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">👤 {member}</span>
+                              <div className="flex items-center space-x-2">
+                                <span className="text-sm text-gray-600 dark:text-gray-400">฿</span>
+                                <input
+                                  type="number"
+                                  value={newBill.memberAmounts[member] || 0}
+                                  onChange={(e) => updateMemberAmount(member, parseFloat(e.target.value) || 0)}
+                                  className="w-24 px-2 py-1 border border-gray-300 dark:border-gray-600 rounded focus:ring-2 focus:ring-gray-500 focus:border-transparent dark:bg-gray-600 dark:text-gray-100 text-sm"
+                                  min="0"
+                                  step="0.01"
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+
+                        {/* แสดงยอดรวม */}
+                        <div className="mt-4 p-3 bg-gradient-to-r from-indigo-50 to-purple-50 dark:from-indigo-900 dark:to-purple-900 rounded-lg border border-indigo-200 dark:border-indigo-700">
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm font-medium text-indigo-700 dark:text-indigo-300">
+                              ยอดรวมที่กรอก:
+                            </span>
+                            <div className="flex items-center space-x-2">
+                              {(() => {
+                                const validMembers = newBill.members.filter(m => m.trim());
+                                const totalCustomAmount = (newBill.memberAmounts['คุณ'] || 0) +
+                                  validMembers.reduce((sum, member) => sum + (newBill.memberAmounts[member] || 0), 0);
+                                const targetTotal = parseFloat(newBill.totalAmount) || 0;
+                                const isCorrect = Math.abs(totalCustomAmount - targetTotal) < 0.01 && targetTotal > 0;
+                                
+                                return (
+                                  <>
+                                    <span className={`text-sm font-bold ${
+                                      isCorrect 
+                                        ? 'text-green-600 dark:text-green-400' 
+                                        : 'text-red-600 dark:text-red-400'
+                                    }`}>
+                                      ฿{totalCustomAmount.toLocaleString()}
+                                    </span>
+                                    <span className="text-sm text-gray-500 dark:text-gray-400">
+                                      / ฿{targetTotal.toLocaleString()}
+                                    </span>
+                                    {isCorrect ? (
+                                      <span className="text-green-600 dark:text-green-400 text-sm">✅</span>
+                                    ) : (
+                                      <span className="text-red-600 dark:text-red-400 text-sm">❌</span>
+                                    )}
+                                  </>
+                                );
+                              })()}
+                            </div>
+                          </div>
+                          {(() => {
+                            const validMembers = newBill.members.filter(m => m.trim());
+                            const totalCustomAmount = (newBill.memberAmounts['คุณ'] || 0) +
+                              validMembers.reduce((sum, member) => sum + (newBill.memberAmounts[member] || 0), 0);
+                            const targetTotal = parseFloat(newBill.totalAmount) || 0;
+                            const isCorrect = Math.abs(totalCustomAmount - targetTotal) < 0.01 && targetTotal > 0;
+                            
+                            if (!isCorrect && targetTotal > 0) {
+                              const difference = targetTotal - totalCustomAmount;
+                              return (
+                                <div className="mt-2 text-xs text-red-600 dark:text-red-400">
+                                  {difference > 0 
+                                    ? `ยังขาดอีก ฿${difference.toLocaleString()}` 
+                                    : `เกินไป ฿${Math.abs(difference).toLocaleString()}`
+                                  }
+                                </div>
+                              );
+                            }
+                            return null;
+                          })()}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
 
                 <div className="bg-gray-50 dark:bg-gray-700 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse gap-3">
                   <button
                     onClick={handleCreateBill}
-                    disabled={!newBill.title || !newBill.totalAmount || newBill.members.filter(m => m.trim()).length === 0}
+                    disabled={(() => {
+                      // Basic validation
+                      if (!newBill.title || !newBill.totalAmount || newBill.members.filter(m => m.trim()).length === 0) {
+                        return true;
+                      }
+                      
+                      // Custom split validation
+                      if (newBill.splitType === 'custom') {
+                        const validMembers = newBill.members.filter(m => m.trim());
+                        const totalCustomAmount = (newBill.memberAmounts['คุณ'] || 0) +
+                          validMembers.reduce((sum, member) => sum + (newBill.memberAmounts[member] || 0), 0);
+                        const targetTotal = parseFloat(newBill.totalAmount) || 0;
+                        return Math.abs(totalCustomAmount - targetTotal) > 0.01;
+                      }
+                      
+                      return false;
+                    })()}
                     className="w-full inline-flex justify-center rounded-lg border border-transparent shadow-sm px-4 py-2 bg-gray-900 dark:bg-white text-base font-medium text-white dark:text-gray-900 hover:bg-gray-800 dark:hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed sm:w-auto sm:text-sm transition-all"
                   >
                     📋 สร้างบิล
