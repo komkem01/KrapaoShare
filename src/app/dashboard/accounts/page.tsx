@@ -47,7 +47,11 @@ export default function AccountsPage() {
   const [showJoinModal, setShowJoinModal] = useState(false);
   const [showTransferModal, setShowTransferModal] = useState(false);
   const [showInviteModal, setShowInviteModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
+  const [editingAccount, setEditingAccount] = useState<Account | null>(null);
+  const [deletingAccount, setDeletingAccount] = useState<Account | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [showSuccessMessage, setShowSuccessMessage] = useState(false);
 
@@ -203,6 +207,43 @@ export default function AccountsPage() {
     setIsLoading(false);
     setShowTransferModal(false);
     setTransferData({ fromAccountId: 0, toAccountId: 0, amount: '', note: '' });
+    setShowSuccessMessage(true);
+    setTimeout(() => setShowSuccessMessage(false), 3000);
+  };
+
+  const handleEditAccount = (account: Account) => {
+    setEditingAccount(account);
+    setShowEditModal(true);
+  };
+
+  const handleUpdateAccount = async () => {
+    if (!editingAccount || !editingAccount.name) {
+      alert('กรุณากรอกชื่อบัญชี');
+      return;
+    }
+
+    setIsLoading(true);
+    await new Promise(resolve => setTimeout(resolve, 1500));
+    setIsLoading(false);
+    setShowEditModal(false);
+    setEditingAccount(null);
+    setShowSuccessMessage(true);
+    setTimeout(() => setShowSuccessMessage(false), 3000);
+  };
+
+  const handleDeleteAccount = (account: Account) => {
+    setDeletingAccount(account);
+    setShowDeleteModal(true);
+  };
+
+  const confirmDeleteAccount = async () => {
+    if (!deletingAccount) return;
+
+    setIsLoading(true);
+    await new Promise(resolve => setTimeout(resolve, 1500));
+    setIsLoading(false);
+    setShowDeleteModal(false);
+    setDeletingAccount(null);
     setShowSuccessMessage(true);
     setTimeout(() => setShowSuccessMessage(false), 3000);
   };
@@ -461,15 +502,33 @@ export default function AccountsPage() {
                             </p>
                           </div>
                         </div>
-                        <div className="text-right">
-                          <div className="text-lg font-bold text-gray-900 dark:text-white">
-                            ฿{account.balance.toLocaleString()}
-                          </div>
-                          {account.type === 'shared' && account.members && (
-                            <div className="text-xs text-gray-500 dark:text-gray-400">
-                              {account.members.length} สมาชิก
+                        <div className="flex items-center space-x-3">
+                          <div className="text-right">
+                            <div className="text-lg font-bold text-gray-900 dark:text-white">
+                              ฿{account.balance.toLocaleString()}
                             </div>
-                          )}
+                            {account.type === 'shared' && account.members && (
+                              <div className="text-xs text-gray-500 dark:text-gray-400">
+                                {account.members.length} สมาชิก
+                              </div>
+                            )}
+                          </div>
+                          <div className="flex space-x-1">
+                            <button
+                              onClick={() => handleEditAccount(account)}
+                              className="p-1 text-blue-500 hover:text-blue-600 dark:hover:text-blue-400 rounded hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-colors"
+                              title="แก้ไขบัญชี"
+                            >
+                              ✏️
+                            </button>
+                            <button
+                              onClick={() => handleDeleteAccount(account)}
+                              className="p-1 text-red-500 hover:text-red-600 dark:hover:text-red-400 rounded hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors"
+                              title="ลบบัญชี"
+                            >
+                              🗑️
+                            </button>
+                          </div>
                         </div>
                       </div>
                       
@@ -526,9 +585,22 @@ export default function AccountsPage() {
                           )}
                         </div>
                       </div>
-                      <button className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
-                        ⚙️
-                      </button>
+                      <div className="flex space-x-2">
+                        <button
+                          onClick={() => handleEditAccount(account)}
+                          className="p-2 text-blue-500 hover:text-blue-600 dark:hover:text-blue-400 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-colors"
+                          title="แก้ไขบัญชี"
+                        >
+                          ✏️
+                        </button>
+                        <button
+                          onClick={() => handleDeleteAccount(account)}
+                          className="p-2 text-red-500 hover:text-red-600 dark:hover:text-red-400 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors"
+                          title="ลบบัญชี"
+                        >
+                          🗑️
+                        </button>
+                      </div>
                     </div>
 
                     <div className="text-3xl font-bold text-gray-900 dark:text-white mb-4">
@@ -637,6 +709,20 @@ export default function AccountsPage() {
                           title="เชิญสมาชิก"
                         >
                           ➕
+                        </button>
+                        <button
+                          onClick={() => handleEditAccount(account)}
+                          className="p-2 text-green-500 hover:text-green-600 dark:hover:text-green-400 rounded-lg hover:bg-green-50 dark:hover:bg-green-900/30"
+                          title="แก้ไขบัญชี"
+                        >
+                          ✏️
+                        </button>
+                        <button
+                          onClick={() => handleDeleteAccount(account)}
+                          className="p-2 text-red-500 hover:text-red-600 dark:hover:text-red-400 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/30"
+                          title="ลบบัญชี"
+                        >
+                          🗑️
                         </button>
                       </div>
                     </div>
@@ -1213,6 +1299,223 @@ export default function AccountsPage() {
                       className="flex-1 px-6 py-3 bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-600 hover:to-indigo-700 disabled:from-gray-400 disabled:to-gray-500 text-white rounded-xl transition-all duration-200 font-medium disabled:cursor-not-allowed"
                     >
                       {isLoading ? 'กำลังโอน...' : 'โอนเงิน'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Edit Account Modal */}
+        {showEditModal && editingAccount && (
+          <div className="fixed inset-0 z-50 overflow-y-auto">
+            <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+              <div 
+                className="fixed inset-0 transition-opacity backdrop-blur-sm" 
+                onClick={() => setShowEditModal(false)}
+              >
+                <div className="absolute inset-0 bg-gray-900/80 dark:bg-black/80"></div>
+              </div>
+
+              <div className="inline-block align-bottom bg-white dark:bg-gray-800 rounded-2xl text-left overflow-hidden shadow-2xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full relative z-10 border border-gray-200 dark:border-gray-700">
+                <div className="relative bg-gradient-to-r from-blue-500 to-indigo-600 px-6 py-4">
+                  <div className="absolute inset-0 bg-white/10 backdrop-blur-sm"></div>
+                  <div className="relative flex items-center justify-between">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
+                        <span className="text-white text-xl">✏️</span>
+                      </div>
+                      <h3 className="text-xl font-bold text-white">แก้ไขบัญชี</h3>
+                    </div>
+                    <button
+                      onClick={() => setShowEditModal(false)}
+                      className="w-8 h-8 bg-white/20 hover:bg-white/30 rounded-lg flex items-center justify-center text-white transition-colors duration-200"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                </div>
+
+                <div className="bg-white dark:bg-gray-800 px-6 py-6">
+                  <div className="space-y-6">
+                    {/* Account Name */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        ชื่อบัญชี *
+                      </label>
+                      <input
+                        type="text"
+                        value={editingAccount.name}
+                        onChange={(e) => setEditingAccount({...editingAccount, name: e.target.value})}
+                        className="w-full px-4 py-3 border border-gray-200 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 dark:bg-gray-700 dark:text-white"
+                        placeholder="ชื่อบัญชี"
+                      />
+                    </div>
+
+                    {/* Current Balance (Read Only) */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        ยอดเงินปัจจุบัน
+                      </label>
+                      <div className="w-full px-4 py-3 border border-gray-200 dark:border-gray-600 rounded-xl bg-gray-50 dark:bg-gray-700 text-gray-500 dark:text-gray-400">
+                        ฿{editingAccount.balance.toLocaleString()}
+                      </div>
+                    </div>
+
+                    {/* Color */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        สีประจำบัญชี
+                      </label>
+                      <div className="flex space-x-2">
+                        {['#3B82F6', '#10B981', '#8B5CF6', '#F59E0B', '#EF4444', '#6B7280'].map((color) => (
+                          <button
+                            key={color}
+                            onClick={() => setEditingAccount({...editingAccount, color})}
+                            className={`w-8 h-8 rounded-full border-2 ${
+                              editingAccount.color === color ? 'border-gray-800 dark:border-white' : 'border-gray-300'
+                            }`}
+                            style={{ backgroundColor: color }}
+                          />
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Bank Details (Personal Only) */}
+                    {editingAccount.type === 'personal' && (
+                      <>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                            ธนาคาร
+                          </label>
+                          <select
+                            value={editingAccount.bankName || ''}
+                            onChange={(e) => setEditingAccount({...editingAccount, bankName: e.target.value})}
+                            className="w-full px-4 py-3 border border-gray-200 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 dark:bg-gray-700 dark:text-white"
+                          >
+                            <option value="">เลือกธนาคาร</option>
+                            <option value="ธนาคารกสิกรไทย">ธนาคารกสิกรไทย</option>
+                            <option value="ธนาคารกรุงเทพ">ธนาคารกรุงเทพ</option>
+                            <option value="ธนาคารไทยพาณิชย์">ธนาคารไทยพาณิชย์</option>
+                            <option value="ธนาคารกรุงไทย">ธนาคารกรุงไทย</option>
+                            <option value="ธนาคารทหารไทยธนชาต">ธนาคารทหารไทยธนชาต</option>
+                            <option value="ธนาคารกรุงศรีอยุธยา">ธนาคารกรุงศรีอยุธยา</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                            เลขที่บัญชี
+                          </label>
+                          <input
+                            type="text"
+                            value={editingAccount.accountNumber || ''}
+                            onChange={(e) => setEditingAccount({...editingAccount, accountNumber: e.target.value})}
+                            className="w-full px-4 py-3 border border-gray-200 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 dark:bg-gray-700 dark:text-white"
+                            placeholder="123-4-56789-0"
+                          />
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                <div className="bg-gradient-to-r from-gray-50/80 to-gray-100/80 dark:from-gray-700/80 dark:to-gray-800/80 px-6 py-4 border-t border-gray-200/50 dark:border-gray-600/50">
+                  <div className="flex space-x-4">
+                    <button
+                      onClick={() => setShowEditModal(false)}
+                      className="flex-1 px-6 py-3 border-2 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-700 transition-all duration-200 font-medium"
+                    >
+                      ยกเลิก
+                    </button>
+                    <button
+                      onClick={handleUpdateAccount}
+                      disabled={isLoading}
+                      className="flex-1 px-6 py-3 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 disabled:from-gray-400 disabled:to-gray-500 text-white rounded-xl transition-all duration-200 font-medium disabled:cursor-not-allowed"
+                    >
+                      {isLoading ? 'กำลังบันทึก...' : 'บันทึกการแก้ไข'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Delete Confirmation Modal */}
+        {showDeleteModal && deletingAccount && (
+          <div className="fixed inset-0 z-50 overflow-y-auto">
+            <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+              <div 
+                className="fixed inset-0 transition-opacity backdrop-blur-sm" 
+                onClick={() => setShowDeleteModal(false)}
+              >
+                <div className="absolute inset-0 bg-gray-900/80 dark:bg-black/80"></div>
+              </div>
+
+              <div className="inline-block align-bottom bg-white dark:bg-gray-800 rounded-2xl text-left overflow-hidden shadow-2xl transform transition-all sm:my-8 sm:align-middle sm:max-w-md sm:w-full relative z-10 border border-gray-200 dark:border-gray-700">
+                <div className="relative bg-gradient-to-r from-red-500 to-pink-600 px-6 py-4">
+                  <div className="absolute inset-0 bg-white/10 backdrop-blur-sm"></div>
+                  <div className="relative flex items-center justify-between">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
+                        <span className="text-white text-xl">⚠️</span>
+                      </div>
+                      <h3 className="text-xl font-bold text-white">ยืนยันการลบบัญชี</h3>
+                    </div>
+                    <button
+                      onClick={() => setShowDeleteModal(false)}
+                      className="w-8 h-8 bg-white/20 hover:bg-white/30 rounded-lg flex items-center justify-center text-white transition-colors duration-200"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                </div>
+
+                <div className="bg-white dark:bg-gray-800 px-6 py-6">
+                  <div className="text-center">
+                    <div className="w-16 h-16 bg-red-100 dark:bg-red-900 rounded-full flex items-center justify-center mx-auto mb-4">
+                      <span className="text-red-600 dark:text-red-400 text-2xl">🗑️</span>
+                    </div>
+                    
+                    <h4 className="text-lg font-bold text-gray-900 dark:text-white mb-2">
+                      คุณต้องการลบบัญชี "{deletingAccount.name}" หรือไม่?
+                    </h4>
+                    
+                    <div className="mb-4 p-4 bg-red-50 dark:bg-red-900/30 rounded-lg border border-red-200 dark:border-red-700">
+                      <p className="text-sm text-red-800 dark:text-red-200 font-medium mb-2">
+                        คำเตือน: การดำเนินการนี้ไม่สามารถยกเลิกได้
+                      </p>
+                      <ul className="text-sm text-red-700 dark:text-red-300 text-left list-disc list-inside space-y-1">
+                        <li>ข้อมูลบัญชีจะถูกลบถาวร</li>
+                        <li>ประวัติรายการทั้งหมดจะหายไป</li>
+                        <li>ยอดเงินคงเหลือ: ฿{deletingAccount.balance.toLocaleString()}</li>
+                        {deletingAccount.type === 'shared' && deletingAccount.members && (
+                          <li>สมาชิกทั้งหมด ({deletingAccount.members.length} คน) จะไม่สามารถเข้าถึงบัญชีได้</li>
+                        )}
+                      </ul>
+                    </div>
+
+                    <p className="text-gray-600 dark:text-gray-400 text-sm">
+                      หากคุณแน่ใจ กรุณาคลิก "ลบบัญชี" เพื่อดำเนินการต่อ
+                    </p>
+                  </div>
+                </div>
+
+                <div className="bg-gradient-to-r from-gray-50/80 to-gray-100/80 dark:from-gray-700/80 dark:to-gray-800/80 px-6 py-4 border-t border-gray-200/50 dark:border-gray-600/50">
+                  <div className="flex space-x-4">
+                    <button
+                      onClick={() => setShowDeleteModal(false)}
+                      className="flex-1 px-6 py-3 border-2 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-700 transition-all duration-200 font-medium"
+                    >
+                      ยกเลิก
+                    </button>
+                    <button
+                      onClick={confirmDeleteAccount}
+                      disabled={isLoading}
+                      className="flex-1 px-6 py-3 bg-gradient-to-r from-red-500 to-pink-600 hover:from-red-600 hover:to-pink-700 disabled:from-gray-400 disabled:to-gray-500 text-white rounded-xl transition-all duration-200 font-medium disabled:cursor-not-allowed"
+                    >
+                      {isLoading ? 'กำลังลบ...' : '🗑️ ลบบัญชี'}
                     </button>
                   </div>
                 </div>

@@ -1,9 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 
 export default function TransactionsPage() {
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState<'all' | 'income' | 'expense'>('all');
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -83,6 +85,20 @@ export default function TransactionsPage() {
     }
   ]);
 
+  // โหลดข้อมูลจาก localStorage เมื่อเริ่มต้น
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const savedTransactions = JSON.parse(localStorage.getItem('transactions') || '[]');
+      if (savedTransactions.length > 0) {
+        // รวมข้อมูลจาก localStorage กับข้อมูลเริ่มต้น
+        const allTransactions = [...savedTransactions, ...mockTransactions];
+        // เรียงตาม ID (ใหม่ไปเก่า)
+        const sortedTransactions = allTransactions.sort((a, b) => b.id - a.id);
+        setMockTransactions(sortedTransactions);
+      }
+    }
+  }, []);
+
   const categories = {
     expense: ['อาหาร', 'ค่าเดินทาง', 'เสื้อผ้า', 'ความบันเทิง', 'สุขภาพ', 'การศึกษา', 'อื่นๆ'],
     income: ['งาน', 'รายได้อื่นๆ', 'การลงทุน', 'ของขวัญ']
@@ -142,7 +158,16 @@ export default function TransactionsPage() {
 
   const confirmDeleteTransaction = () => {
     if (deletingTransaction) {
-      setMockTransactions(prev => prev.filter(t => t.id !== deletingTransaction.id));
+      const updatedTransactions = mockTransactions.filter(t => t.id !== deletingTransaction.id);
+      setMockTransactions(updatedTransactions);
+      
+      // อัพเดท localStorage (เฉพาะรายการที่เพิ่มจาก add-transaction)
+      if (typeof window !== 'undefined') {
+        const savedTransactions = JSON.parse(localStorage.getItem('transactions') || '[]');
+        const filteredSaved = savedTransactions.filter((t: any) => t.id !== deletingTransaction.id);
+        localStorage.setItem('transactions', JSON.stringify(filteredSaved));
+      }
+      
       setShowDeleteModal(false);
       setDeletingTransaction(null);
     }
@@ -166,7 +191,7 @@ export default function TransactionsPage() {
       return;
     }
 
-    setMockTransactions(prev => prev.map(t => 
+    const updatedTransactions = mockTransactions.map(t => 
       t.id === editingTransaction.id 
         ? {
             ...t,
@@ -177,7 +202,27 @@ export default function TransactionsPage() {
             date: editingTransaction.date
           }
         : t
-    ));
+    );
+    
+    setMockTransactions(updatedTransactions);
+
+    // อัพเดท localStorage (เฉพาะรายการที่เพิ่มจาก add-transaction)
+    if (typeof window !== 'undefined') {
+      const savedTransactions = JSON.parse(localStorage.getItem('transactions') || '[]');
+      const updatedSaved = savedTransactions.map((t: any) => 
+        t.id === editingTransaction.id 
+          ? {
+              ...t,
+              type: editingTransaction.type,
+              amount: parseFloat(editingTransaction.amount),
+              description: editingTransaction.description,
+              category: editingTransaction.category,
+              date: editingTransaction.date
+            }
+          : t
+      );
+      localStorage.setItem('transactions', JSON.stringify(updatedSaved));
+    }
 
     setShowEditModal(false);
     setEditingTransaction(null);
@@ -205,7 +250,7 @@ export default function TransactionsPage() {
             </p>
           </div>
           <button
-            onClick={() => setShowAddModal(true)}
+            onClick={() => router.push('/dashboard/add-transaction')}
             className="bg-gray-900 dark:bg-white text-white dark:text-gray-900 px-4 py-2 rounded-lg hover:bg-gray-800 dark:hover:bg-gray-100 transition-colors font-medium"
           >
             + เพิ่มรายการ

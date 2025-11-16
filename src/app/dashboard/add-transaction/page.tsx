@@ -67,13 +67,24 @@ export default function AddTransactionPage() {
       await new Promise(resolve => setTimeout(resolve, 1500));
 
       const transactionData = {
+        id: Date.now(), // ใช้ timestamp เป็น ID ชั่วคราว
         type: activeTab,
         accountId: selectedAccountId,
         categoryId: currentCategory.selectedCategory?.id,
+        category: currentCategory.selectedCategory?.name || '',
         amount: parseFloat(amount),
         description,
-        date
+        date,
+        time: new Date().toLocaleTimeString('th-TH', { 
+          hour: '2-digit', 
+          minute: '2-digit' 
+        })
       };
+
+      // บันทึกลง localStorage
+      const existingTransactions = JSON.parse(localStorage.getItem('transactions') || '[]');
+      const updatedTransactions = [transactionData, ...existingTransactions];
+      localStorage.setItem('transactions', JSON.stringify(updatedTransactions));
 
       console.log('Transaction saved:', transactionData);
 
@@ -92,9 +103,9 @@ export default function AddTransactionPage() {
         )
       );
 
-      // กลับไปหน้า Dashboard
+      // กลับไปหน้า Transactions
       setTimeout(() => {
-        router.push('/dashboard');
+        router.push('/dashboard/transactions');
       }, 1000);
 
     } catch (error) {
@@ -109,9 +120,17 @@ export default function AddTransactionPage() {
     <DashboardLayout>
       <div className="max-w-2xl mx-auto space-y-6">
         {/* Header */}
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">บันทึกรายรับ-รายจ่าย</h1>
-          <p className="text-gray-600 dark:text-gray-400 mt-1">เพิ่มรายการเงินเข้าหรือออก</p>
+        <div className="flex justify-between items-center">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">บันทึกรายรับ-รายจ่าย</h1>
+            <p className="text-gray-600 dark:text-gray-400 mt-1">เพิ่มรายการเงินเข้าหรือออก</p>
+          </div>
+          <button
+            onClick={() => router.push('/dashboard/transactions')}
+            className="px-4 py-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+          >
+            ← กลับ
+          </button>
         </div>
 
         {/* Type Tabs */}
