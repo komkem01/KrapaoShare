@@ -1,0 +1,675 @@
+// KrapaoShare - Complete Database Schema
+// ฐานข้อมูลสำหรับแอปพลิเคชันจัดการเงิน
+
+// ===== CORE TABLES =====
+
+Table users {
+  id uuid [pk]
+  firstname varchar
+  lastname varchar
+  phone varchar
+  birth_date date
+  occupation varchar
+  address text
+  role varchar [note: 'admin member owner']
+  status enum [default: 'active', note: 'active inactive suspended']
+  email varchar [unique]
+  password varchar
+  avatar_url varchar
+  timezone varchar [default: 'Asia/Bangkok']
+  
+  created_at timestamp [default: `now()`]
+  updated_at timestamp [default: `now()`]
+  deleted_at timestamp
+
+  indexes {
+    email [unique]
+    (status, role) [name: 'idx_user_status_role']
+  }
+}
+
+Table user_sessions {
+  id uuid [pk]
+  user_id uuid [ref: > users.id]
+  token varchar [unique]
+  refresh_token varchar [unique]
+  expires_at timestamp
+  device_info text
+  ip_address varchar
+  
+  created_at timestamp [default: `now()`]
+  updated_at timestamp [default: `now()`]
+}
+
+// ===== CONFIGURATION TABLES =====
+
+Table system_settings {
+  id uuid [pk]
+  user_id uuid [ref: > users.id]
+  theme enum [default: 'auto', note: 'auto dark light']
+  language varchar [default: 'th']
+  currency varchar [default: 'THB']
+  date_format varchar [default: 'DD/MM/YYYY']
+  time_format varchar [default: '24h', note: '12h 24h']
+  first_day_week varchar [default: 'monday']
+  push_notifications bool [default: true]
+  email_notifications bool [default: true]
+  
+  created_at timestamp [default: `now()`]
+  updated_at timestamp [default: `now()`]
+  deleted_at timestamp
+
+  indexes {
+    user_id [unique]
+  }
+}
+
+Table types {
+  id uuid [pk]
+  icon varchar
+  color varchar
+  name varchar
+  description text
+  is_system bool [default: false, note: 'system types cannot be deleted']
+  
+  created_at timestamp [default: `now()`]
+  updated_at timestamp [default: `now()`]
+  deleted_at timestamp
+}
+
+Table categories {
+  id uuid [pk]
+  type_id uuid [ref: > types.id]
+  user_id uuid [ref: > users.id]
+  icon varchar
+  color varchar
+  name varchar
+  description text
+  is_active bool [default: true]
+  sort_order int [default: 0]
+  
+  created_at timestamp [default: `now()`]
+  updated_at timestamp [default: `now()`]
+  deleted_at timestamp
+
+  indexes {
+    (user_id, type_id) [name: 'idx_user_categories']
+    (user_id, is_active) [name: 'idx_user_active_categories']
+  }
+}
+
+// ===== ACCOUNT & TRANSACTION TABLES =====
+
+Table accounts {
+  id uuid [pk]
+  user_id uuid [ref: > users.id]
+  name varchar
+  bank_name varchar
+  bank_number varchar
+  account_type enum [default: 'personal', note: 'personal shared business']
+  color varchar
+  start_amount decimal(15,2) [default: 0]
+  current_balance decimal(15,2) [default: 0]
+  is_private bool [default: false]
+  is_active bool [default: true]
+  share_code varchar [unique, note: 'for shared accounts']
+  
+  created_at timestamp [default: `now()`]
+  updated_at timestamp [default: `now()`]
+  deleted_at timestamp
+
+  indexes {
+    user_id [name: 'idx_user_accounts']
+    share_code [unique]
+    (user_id, is_active) [name: 'idx_user_active_accounts']
+  }
+}
+
+Table account_members {
+  id uuid [pk]
+  account_id uuid [ref: > accounts.id]
+  user_id uuid [ref: > users.id]
+  role enum [default: 'member', note: 'owner admin member viewer']
+  permissions json [note: 'view add edit delete permissions']
+  joined_at timestamp [default: `now()`]
+  invited_by uuid [ref: > users.id]
+  
+  created_at timestamp [default: `now()`]
+  updated_at timestamp [default: `now()`]
+
+  indexes {
+    (account_id, user_id) [unique]
+    account_id [name: 'idx_account_members']
+  }
+}
+
+Table transactions {
+  id uuid [pk]
+  user_id uuid [ref: > users.id]
+  account_id uuid [ref: > accounts.id]
+  category_id uuid [ref: > categories.id]
+  type enum [note: 'income expense transfer']
+  amount decimal(15,2)
+  description text
+  transaction_date date
+  transaction_time time
+  reference_number varchar
+  location varchar
+  notes text
+  tags json [note: 'array of tags']
+  receipt_url varchar
+  is_recurring bool [default: false]
+  recurring_bill_id uuid [ref: > recurring_bills.id]
+  
+  // Relations
+  transfer_to_account_id uuid [ref: > accounts.id, note: 'for transfer transactions']
+  bill_id uuid [ref: > bills.id, note: 'if transaction is part of bill split']
+  shared_goal_id uuid [ref: > shared_goals.id, note: 'if transaction contributes to shared goal']
+  budget_id uuid [ref: > budgets.id, note: 'if transaction affects budget']
+  
+  created_at timestamp [default: `now()`]
+  updated_at timestamp [default: `now()`]
+  deleted_at timestamp
+
+  indexes {
+    user_id [name: 'idx_user_transactions']
+    account_id [name: 'idx_account_transactions']
+    category_id [name: 'idx_category_transactions']
+    (user_id, transaction_date) [name: 'idx_user_date_transactions']
+    (user_id, type) [name: 'idx_user_type_transactions']
+    bill_id [name: 'idx_bill_transactions']
+    shared_goal_id [name: 'idx_shared_goal_transactions']
+  }
+}
+
+Table account_transfers {
+  id uuid [pk]
+  from_account_id uuid [ref: > accounts.id]
+  to_account_id uuid [ref: > accounts.id]
+  amount decimal(15,2)
+  description text
+  transfer_fee decimal(15,2) [default: 0]
+  exchange_rate decimal(10,4) [default: 1, note: 'for different currencies']
+  status enum [default: 'completed', note: 'pending completed failed cancelled']
+  
+  created_at timestamp [default: `now()`]
+  updated_at timestamp [default: `now()`]
+
+  indexes {
+    from_account_id [name: 'idx_from_account_transfers']
+    to_account_id [name: 'idx_to_account_transfers']
+    (from_account_id, to_account_id) [name: 'idx_account_pair_transfers']
+  }
+}
+
+// ===== BILLS & SPLITTING TABLES =====
+
+Table bills {
+  id uuid [pk]
+  user_id uuid [ref: > users.id, note: 'bill creator']
+  title varchar
+  description text
+  total_amount decimal(15,2)
+  category_id uuid [ref: > categories.id]
+  bill_date date
+  due_date date
+  split_type enum [default: 'equal', note: 'equal custom percentage']
+  status enum [default: 'active', note: 'active settled cancelled']
+  is_recurring bool [default: false]
+  recurring_bill_id uuid [ref: > recurring_bills.id]
+  receipt_url varchar
+  notes text
+  
+  created_at timestamp [default: `now()`]
+  updated_at timestamp [default: `now()`]
+  deleted_at timestamp
+
+  indexes {
+    user_id [name: 'idx_user_bills']
+    category_id [name: 'idx_category_bills']
+    (user_id, status) [name: 'idx_user_status_bills']
+    due_date [name: 'idx_due_date_bills']
+  }
+}
+
+Table bill_participants {
+  id uuid [pk]
+  bill_id uuid [ref: > bills.id]
+  user_id uuid [ref: > users.id]
+  amount_owed decimal(15,2)
+  amount_paid decimal(15,2) [default: 0]
+  is_settled bool [default: false]
+  settled_at timestamp
+  payment_method varchar
+  payment_reference varchar
+  
+  created_at timestamp [default: `now()`]
+  updated_at timestamp [default: `now()`]
+
+  indexes {
+    bill_id [name: 'idx_bill_participants']
+    user_id [name: 'idx_user_bill_participants']
+    (bill_id, user_id) [unique]
+    (user_id, is_settled) [name: 'idx_user_settled_bills']
+  }
+}
+
+Table recurring_bills {
+  id uuid [pk]
+  user_id uuid [ref: > users.id]
+  title varchar
+  description text
+  amount decimal(15,2)
+  category_id uuid [ref: > categories.id]
+  frequency enum [note: 'daily weekly monthly yearly']
+  frequency_value int [default: 1, note: 'every X days/weeks/months/years']
+  start_date date
+  end_date date
+  next_due_date date
+  is_active bool [default: true]
+  auto_create_bill bool [default: false]
+  remind_days_before int [default: 3]
+  
+  created_at timestamp [default: `now()`]
+  updated_at timestamp [default: `now()`]
+  deleted_at timestamp
+
+  indexes {
+    user_id [name: 'idx_user_recurring_bills']
+    next_due_date [name: 'idx_next_due_date']
+    (user_id, is_active) [name: 'idx_user_active_recurring_bills']
+  }
+}
+
+// ===== BUDGETS & GOALS TABLES =====
+
+Table budgets {
+  id uuid [pk]
+  user_id uuid [ref: > users.id]
+  category_id uuid [ref: > categories.id]
+  name varchar
+  description text
+  budget_amount decimal(15,2)
+  spent_amount decimal(15,2) [default: 0]
+  period_type enum [default: 'monthly', note: 'weekly monthly quarterly yearly custom']
+  period_start date
+  period_end date
+  budget_month int [note: '1-12 for monthly budgets']
+  budget_year int
+  alert_percentage decimal(5,2) [default: 80, note: 'alert when spent % reaches this']
+  is_active bool [default: true]
+  auto_rollover bool [default: false, note: 'rollover unused budget to next period']
+  
+  created_at timestamp [default: `now()`]
+  updated_at timestamp [default: `now()`]
+  deleted_at timestamp
+
+  indexes {
+    user_id [name: 'idx_user_budgets']
+    category_id [name: 'idx_category_budgets']
+    (user_id, period_start, period_end) [name: 'idx_user_period_budgets']
+    (user_id, is_active) [name: 'idx_user_active_budgets']
+  }
+}
+
+Table goals {
+  id uuid [pk]
+  user_id uuid [ref: > users.id]
+  category_id uuid [ref: > categories.id]
+  name varchar
+  description text
+  target_amount decimal(15,2)
+  current_amount decimal(15,2) [default: 0]
+  target_date date
+  priority enum [default: 'medium', note: 'low medium high critical']
+  goal_type enum [default: 'savings', note: 'savings purchase debt_payoff']
+  auto_save_amount decimal(15,2) [default: 0]
+  auto_save_frequency enum [note: 'daily weekly monthly']
+  is_completed bool [default: false]
+  completed_at timestamp
+  
+  created_at timestamp [default: `now()`]
+  updated_at timestamp [default: `now()`]
+  deleted_at timestamp
+
+  indexes {
+    user_id [name: 'idx_user_goals']
+    category_id [name: 'idx_category_goals']
+    (user_id, is_completed) [name: 'idx_user_completed_goals']
+    target_date [name: 'idx_target_date_goals']
+  }
+}
+
+Table shared_goals {
+  id uuid [pk]
+  created_by_user_id uuid [ref: > users.id]
+  category_id uuid [ref: > categories.id]
+  name varchar
+  description text
+  target_amount decimal(15,2)
+  current_amount decimal(15,2) [default: 0]
+  target_date date
+  goal_type enum [default: 'group_savings', note: 'group_savings group_purchase event_fund']
+  share_code varchar [unique, note: 'code for joining goal']
+  auto_save bool [default: false]
+  minimum_contribution decimal(15,2) [default: 0]
+  maximum_members int [default: 50]
+  is_active bool [default: true]
+  is_completed bool [default: false]
+  completed_at timestamp
+  
+  created_at timestamp [default: `now()`]
+  updated_at timestamp [default: `now()`]
+  deleted_at timestamp
+
+  indexes {
+    created_by_user_id [name: 'idx_creator_shared_goals']
+    share_code [unique]
+    (is_active, target_date) [name: 'idx_active_target_shared_goals']
+  }
+}
+
+Table shared_goal_members {
+  id uuid [pk]
+  shared_goal_id uuid [ref: > shared_goals.id]
+  user_id uuid [ref: > users.id]
+  contribution_amount decimal(15,2) [default: 0]
+  target_contribution decimal(15,2)
+  role enum [default: 'member', note: 'creator admin member']
+  joined_at timestamp [default: `now()`]
+  invited_by uuid [ref: > users.id]
+  is_active bool [default: true]
+  
+  created_at timestamp [default: `now()`]
+  updated_at timestamp [default: `now()`]
+
+  indexes {
+    shared_goal_id [name: 'idx_shared_goal_members']
+    user_id [name: 'idx_user_shared_goals']
+    (shared_goal_id, user_id) [unique]
+  }
+}
+
+Table goal_contributions {
+  id uuid [pk]
+  shared_goal_id uuid [ref: > shared_goals.id]
+  user_id uuid [ref: > users.id]
+  transaction_id uuid [ref: > transactions.id]
+  amount decimal(15,2)
+  contribution_date date
+  contribution_method varchar [note: 'manual auto_save transfer']
+  notes text
+  
+  created_at timestamp [default: `now()`]
+  updated_at timestamp [default: `now()`]
+
+  indexes {
+    shared_goal_id [name: 'idx_shared_goal_contributions']
+    user_id [name: 'idx_user_contributions']
+    transaction_id [unique]
+    (shared_goal_id, contribution_date) [name: 'idx_goal_date_contributions']
+  }
+}
+
+// ===== DEBT & LIABILITY TABLES =====
+
+Table debts {
+  id uuid [pk]
+  user_id uuid [ref: > users.id, note: 'person who owes or is owed']
+  creditor_user_id uuid [ref: > users.id, note: 'person who is owed money']
+  debtor_user_id uuid [ref: > users.id, note: 'person who owes money']
+  amount decimal(15,2)
+  paid_amount decimal(15,2) [default: 0]
+  remaining_amount decimal(15,2)
+  description text
+  debt_type enum [note: 'personal loan bill_split advance_payment other']
+  status enum [default: 'active', note: 'active partially_paid fully_paid forgiven']
+  due_date date
+  interest_rate decimal(5,4) [default: 0, note: 'annual interest rate']
+  payment_terms text
+  bill_id uuid [ref: > bills.id, note: 'if debt originated from bill split']
+  
+  created_at timestamp [default: `now()`]
+  updated_at timestamp [default: `now()`]
+  deleted_at timestamp
+
+  indexes {
+    user_id [name: 'idx_user_debts']
+    creditor_user_id [name: 'idx_creditor_debts']
+    debtor_user_id [name: 'idx_debtor_debts']
+    (user_id, status) [name: 'idx_user_status_debts']
+    due_date [name: 'idx_due_date_debts']
+    bill_id [name: 'idx_bill_debts']
+  }
+}
+
+Table debt_payments {
+  id uuid [pk]
+  debt_id uuid [ref: > debts.id]
+  payer_user_id uuid [ref: > users.id]
+  amount decimal(15,2)
+  payment_date date
+  payment_method varchar
+  transaction_id uuid [ref: > transactions.id]
+  notes text
+  
+  created_at timestamp [default: `now()`]
+  updated_at timestamp [default: `now()`]
+
+  indexes {
+    debt_id [name: 'idx_debt_payments']
+    payer_user_id [name: 'idx_payer_payments']
+    transaction_id [unique]
+    payment_date [name: 'idx_payment_date']
+  }
+}
+
+// ===== NOTIFICATION & COMMUNICATION TABLES =====
+
+Table notifications {
+  id uuid [pk]
+  user_id uuid [ref: > users.id]
+  title varchar
+  message text
+  type enum [note: 'transaction bill budget goal debt reminder system']
+  priority enum [default: 'normal', note: 'low normal high urgent']
+  icon varchar
+  data json [note: 'additional data for notification']
+  is_read bool [default: false]
+  read_at timestamp
+  action_url varchar [note: 'URL to navigate when clicked']
+  expires_at timestamp
+  
+  created_at timestamp [default: `now()`]
+  updated_at timestamp [default: `now()`]
+  deleted_at timestamp
+
+  indexes {
+    user_id [name: 'idx_user_notifications']
+    (user_id, is_read) [name: 'idx_user_read_notifications']
+    (user_id, type) [name: 'idx_user_type_notifications']
+    created_at [name: 'idx_notification_created_at']
+  }
+}
+
+Table notification_settings {
+  id uuid [pk]
+  user_id uuid [ref: > users.id]
+  notification_type varchar [note: 'transaction_added bill_created budget_exceeded etc.']
+  push_enabled bool [default: true]
+  email_enabled bool [default: true]
+  sms_enabled bool [default: false]
+  in_app_enabled bool [default: true]
+  frequency enum [default: 'immediate', note: 'immediate daily weekly never']
+  
+  created_at timestamp [default: `now()`]
+  updated_at timestamp [default: `now()`]
+
+  indexes {
+    user_id [name: 'idx_user_notification_settings']
+    (user_id, notification_type) [unique]
+  }
+}
+
+// ===== ANALYTICS & REPORTING TABLES =====
+
+Table user_analytics {
+  id uuid [pk]
+  user_id uuid [ref: > users.id]
+  month int [note: '1-12']
+  year int
+  total_income decimal(15,2) [default: 0]
+  total_expense decimal(15,2) [default: 0]
+  net_income decimal(15,2) [default: 0]
+  transaction_count int [default: 0]
+  avg_transaction_amount decimal(15,2) [default: 0]
+  top_category_id uuid [ref: > categories.id]
+  top_category_amount decimal(15,2) [default: 0]
+  savings_rate decimal(5,2) [default: 0, note: 'percentage of income saved']
+  
+  created_at timestamp [default: `now()`]
+  updated_at timestamp [default: `now()`]
+
+  indexes {
+    user_id [name: 'idx_user_analytics']
+    (user_id, year, month) [unique]
+    (year, month) [name: 'idx_period_analytics']
+  }
+}
+
+Table category_analytics {
+  id uuid [pk]
+  user_id uuid [ref: > users.id]
+  category_id uuid [ref: > categories.id]
+  month int [note: '1-12']
+  year int
+  transaction_count int [default: 0]
+  total_amount decimal(15,2) [default: 0]
+  avg_amount decimal(15,2) [default: 0]
+  budget_amount decimal(15,2) [default: 0]
+  budget_utilization decimal(5,2) [default: 0, note: 'percentage of budget used']
+  
+  created_at timestamp [default: `now()`]
+  updated_at timestamp [default: `now()`]
+
+  indexes {
+    user_id [name: 'idx_user_category_analytics']
+    category_id [name: 'idx_category_analytics']
+    (user_id, category_id, year, month) [unique]
+  }
+}
+
+// ===== AUDIT & LOGGING TABLES =====
+
+Table audit_logs {
+  id uuid [pk]
+  user_id uuid [ref: > users.id]
+  action varchar [note: 'CREATE UPDATE DELETE LOGIN LOGOUT etc.']
+  table_name varchar
+  record_id varchar
+  old_values json
+  new_values json
+  ip_address varchar
+  user_agent text
+  
+  created_at timestamp [default: `now()`]
+
+  indexes {
+    user_id [name: 'idx_user_audit_logs']
+    (table_name, record_id) [name: 'idx_table_record_audit']
+    action [name: 'idx_action_audit']
+    created_at [name: 'idx_audit_created_at']
+  }
+}
+
+// ===== INTEGRATIONS & EXTERNAL SERVICES =====
+
+Table bank_connections {
+  id uuid [pk]
+  user_id uuid [ref: > users.id]
+  bank_name varchar
+  account_id uuid [ref: > accounts.id]
+  external_account_id varchar
+  connection_type enum [note: 'open_banking api scraping manual']
+  access_token_encrypted text
+  refresh_token_encrypted text
+  last_sync_at timestamp
+  sync_status enum [default: 'active', note: 'active inactive error']
+  sync_frequency enum [default: 'daily', note: 'realtime hourly daily weekly']
+  auto_categorize bool [default: true]
+  
+  created_at timestamp [default: `now()`]
+  updated_at timestamp [default: `now()`]
+  deleted_at timestamp
+
+  indexes {
+    user_id [name: 'idx_user_bank_connections']
+    account_id [name: 'idx_account_bank_connections']
+    (user_id, bank_name) [name: 'idx_user_bank_connections_bank']
+  }
+}
+
+Table imported_transactions {
+  id uuid [pk]
+  user_id uuid [ref: > users.id]
+  bank_connection_id uuid [ref: > bank_connections.id]
+  external_transaction_id varchar
+  transaction_id uuid [ref: > transactions.id]
+  raw_data json [note: 'original transaction data from bank']
+  import_status enum [default: 'pending', note: 'pending processed duplicate error']
+  match_confidence decimal(3,2) [note: 'confidence level for auto-categorization']
+  
+  created_at timestamp [default: `now()`]
+  updated_at timestamp [default: `now()`]
+
+  indexes {
+    user_id [name: 'idx_user_imported_transactions']
+    bank_connection_id [name: 'idx_bank_imported_transactions']
+    external_transaction_id [name: 'idx_external_transaction_id']
+    import_status [name: 'idx_import_status']
+  }
+}
+
+// ===== SYSTEM TABLES =====
+
+Table app_settings {
+  id uuid [pk]
+  setting_key varchar [unique]
+  setting_value text
+  setting_type enum [note: 'string number boolean json']
+  description text
+  is_public bool [default: false, note: 'can be accessed by frontend']
+  
+  created_at timestamp [default: `now()`]
+  updated_at timestamp [default: `now()`]
+}
+
+Table exchange_rates {
+  id uuid [pk]
+  from_currency varchar
+  to_currency varchar
+  rate decimal(10,6)
+  effective_date date
+  source varchar [note: 'API source for exchange rate']
+  
+  created_at timestamp [default: `now()`]
+  updated_at timestamp [default: `now()`]
+
+  indexes {
+    (from_currency, to_currency, effective_date) [unique]
+    effective_date [name: 'idx_exchange_rate_date']
+  }
+}
+
+// ===== RELATIONSHIPS SUMMARY =====
+// Users can have multiple accounts, transactions, bills, budgets, goals
+// Accounts can be shared between users via account_members
+// Transactions are linked to accounts, categories, and can be part of bills or goals
+// Bills can be split between multiple participants
+// Goals can be individual or shared between multiple users
+// Debts track money owed between users, often originating from bill splits
+// Notifications keep users informed of important events
+// Analytics tables provide aggregated data for reporting
+// Audit logs track all important actions for security and debugging
+// Bank connections enable automatic transaction import
+// System tables store configuration and exchange rates
