@@ -9,7 +9,8 @@ import PrimaryButton from '@/components/auth/PrimaryButton';
 
 export default function SignUpPage() {
   const [formData, setFormData] = useState({
-    name: '',
+    firstName: '',
+    lastName: '',
     email: '',
     password: '',
     confirmPassword: ''
@@ -53,10 +54,16 @@ export default function SignUpPage() {
     // Validation
     const newErrors: Record<string, string> = {};
     
-    if (!formData.name.trim()) {
-      newErrors.name = 'กรุณากรอกชื่อ';
-    } else if (formData.name.trim().length < 2) {
-      newErrors.name = 'ชื่อต้องมีอย่างน้อย 2 ตัวอักษร';
+    if (!formData.firstName.trim()) {
+      newErrors.firstName = 'กรุณากรอกชื่อ';
+    } else if (formData.firstName.trim().length < 2) {
+      newErrors.firstName = 'ชื่อต้องมีอย่างน้อย 2 ตัวอักษร';
+    }
+
+    if (!formData.lastName.trim()) {
+      newErrors.lastName = 'กรุณากรอกนามสกุล';
+    } else if (formData.lastName.trim().length < 2) {
+      newErrors.lastName = 'นามสกุลต้องมีอย่างน้อย 2 ตัวอักษร';
     }
 
     if (!formData.email) {
@@ -85,7 +92,7 @@ export default function SignUpPage() {
 
     try {
       // TODO: Implement email/password signup
-      console.log('Signup form submitted:', formData);
+  console.log('Signup form submitted:', formData);
       await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate API call
     } catch (error) {
       console.error('Signup error:', error);
@@ -133,19 +140,35 @@ export default function SignUpPage() {
             </div>
           )}
 
-          <InputField
-            name="name"
-            type="text"
-            placeholder="ชื่อ-นามสกุล"
-            value={formData.name}
-            onChange={handleInputChange}
-            error={errors.name}
-            icon={
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-              </svg>
-            }
-          />
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <InputField
+              name="firstName"
+              type="text"
+              placeholder="ชื่อ"
+              value={formData.firstName}
+              onChange={handleInputChange}
+              error={errors.firstName}
+              icon={
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                </svg>
+              }
+            />
+
+            <InputField
+              name="lastName"
+              type="text"
+              placeholder="นามสกุล"
+              value={formData.lastName}
+              onChange={handleInputChange}
+              error={errors.lastName}
+              icon={
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                </svg>
+              }
+            />
+          </div>
 
           <InputField
             name="email"
