@@ -7,6 +7,8 @@ import GoogleButton from '@/components/auth/GoogleButton';
 import InputField from '@/components/auth/InputField';
 import PrimaryButton from '@/components/auth/PrimaryButton';
 
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:8080/api/v1';
+
 export default function SignUpPage() {
   const [formData, setFormData] = useState({
     firstName: '',
@@ -17,6 +19,7 @@ export default function SignUpPage() {
   });
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [successMessage, setSuccessMessage] = useState('');
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -24,6 +27,9 @@ export default function SignUpPage() {
       ...prev,
       [name]: value
     }));
+    if (successMessage) {
+      setSuccessMessage('');
+    }
     // Clear error when user starts typing
     if (errors[name]) {
       setErrors(prev => ({
@@ -50,6 +56,7 @@ export default function SignUpPage() {
     e.preventDefault();
     setLoading(true);
     setErrors({});
+    setSuccessMessage('');
 
     // Validation
     const newErrors: Record<string, string> = {};
@@ -91,9 +98,38 @@ export default function SignUpPage() {
     }
 
     try {
-      // TODO: Implement email/password signup
-  console.log('Signup form submitted:', formData);
-      await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate API call
+      const payload = {
+        firstname: formData.firstName.trim(),
+        lastname: formData.lastName.trim(),
+        email: formData.email.trim(),
+        password: formData.password
+      };
+
+      const response = await fetch(`${API_BASE_URL}/auth/register`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      });
+
+      const data = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        const errorMessage = data?.message || data?.error || 'เกิดข้อผิดพลาดในการสมัครสมาชิก';
+        setErrors({ general: errorMessage });
+        return;
+      }
+
+      setSuccessMessage(data?.message || 'ลงทะเบียนสำเร็จ');
+      console.log('Signup success:', data?.data || data);
+      setFormData({
+        firstName: '',
+        lastName: '',
+        email: '',
+        password: '',
+        confirmPassword: ''
+      });
     } catch (error) {
       console.error('Signup error:', error);
       setErrors({ general: 'เกิดข้อผิดพลาดในการสมัครสมาชิก' });
@@ -139,6 +175,12 @@ export default function SignUpPage() {
               <p className="text-sm text-red-600 dark:text-red-400">{errors.general}</p>
             </div>
           )}
+
+            {successMessage && (
+              <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-3">
+                <p className="text-sm text-green-700 dark:text-green-300">{successMessage}</p>
+              </div>
+            )}
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <InputField

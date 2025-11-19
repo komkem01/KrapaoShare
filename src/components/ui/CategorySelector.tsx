@@ -5,7 +5,7 @@ import { useCategories, Category } from '@/contexts/CategoryContext';
 
 interface CategorySelectorProps {
   type: 'income' | 'expense';
-  selectedCategoryId?: number;
+  selectedCategoryId?: string;
   onSelect: (category: Category) => void;
   placeholder?: string;
   className?: string;

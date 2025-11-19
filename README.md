@@ -30,6 +30,24 @@
 4. **เปิดเว็บไซต์**
    เปิด [http://localhost:3000](http://localhost:3000) ใน browser
 
+## การตั้งค่า Environment Variables
+
+โปรเจกต์ฝั่ง frontend จะเรียก Google OAuth ผ่าน backend ดังนั้นจึงต้องเตรียมค่า Client ของ Google ให้พร้อมในไฟล์ `.env.local` (ถูก gitignore ไว้เรียบร้อยแล้ว)
+
+```bash
+AUTH_GOOGLE_CLIENT_ID=your_google_client_id_here
+AUTH_GOOGLE_CLIENT_SECRET=your_google_client_secret_here
+AUTH_GOOGLE_REDIRECT_URL=http://localhost:8080/auth/google/callback
+```
+
+> **หมายเหตุ:** หากต้องการค่าอื่น (เช่น production) สามารถสร้าง credential ใหม่จาก Google Cloud Console แล้วอัปเดตไฟล์นี้ได้ทุกเมื่อ
+
+## เครื่องมือทดสอบ API
+
+- **Postman Collection:** `docs/api.postman_collection.json`
+   - ครอบคลุม endpoints สำหรับ Users, Types, Categories, Exchange Rates และ System Settings
+   - ตั้งค่าตัวแปร `baseUrl` และ `authToken` เพื่อเริ่มทดสอบได้ทันที
+
 ## โครงสร้างโปรเจกต์
 
 ```
