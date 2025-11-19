@@ -4,6 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useNotifications } from '@/contexts/NotificationContext';
+import { useUser } from '@/contexts/UserContext';
 import NotificationPanel from '@/components/notifications/NotificationPanel';
 
 interface DashboardLayoutProps {
@@ -26,14 +27,15 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
     deleteNotification
   } = useNotifications();
 
+  const { user, loading: userLoading, error: userError, logout } = useUser();
+
   const handleLogout = () => {
     console.log('Logout clicked, showing modal...');
     setShowLogoutModal(true);
   };
 
   const confirmLogout = () => {
-    // Clear any stored auth data here if needed
-    window.location.href = '/auth/login';
+    logout();
   };
 
   const cancelLogout = () => {
@@ -169,16 +171,54 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
           {/* User Profile */}
           <div className="px-4 py-4 border-t border-gray-200 dark:border-gray-700">
             <div className="flex items-center space-x-3 px-4 py-3">
-              <div className="w-8 h-8 bg-gray-300 dark:bg-gray-600 rounded-full flex items-center justify-center">
-                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">U</span>
-              </div>
-              <div className="flex-1">
-                <div className="text-sm font-medium text-gray-900 dark:text-white">ผู้ใช้งาน</div>
-                <div className="text-xs text-gray-500 dark:text-gray-400">user@example.com</div>
-              </div>
+              {userLoading ? (
+                <>
+                  <div className="w-8 h-8 bg-gray-300 dark:bg-gray-600 rounded-full animate-pulse"></div>
+                  <div className="flex-1">
+                    <div className="h-4 bg-gray-300 dark:bg-gray-600 rounded animate-pulse mb-1"></div>
+                    <div className="h-3 bg-gray-300 dark:bg-gray-600 rounded animate-pulse w-2/3"></div>
+                  </div>
+                </>
+              ) : user ? (
+                <>
+                  {user.avatar_url ? (
+                    <img 
+                      src={user.avatar_url} 
+                      alt={user.firstname}
+                      className="w-8 h-8 rounded-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
+                      <span className="text-sm font-medium text-white">
+                        {user.firstname?.charAt(0)?.toUpperCase() || 'U'}
+                      </span>
+                    </div>
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-medium text-gray-900 dark:text-white truncate">
+                      {user.firstname || 'ผู้ใช้งาน'}
+                    </div>
+                    <div className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                      {user.email || 'user@example.com'}
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="w-8 h-8 bg-red-300 dark:bg-red-600 rounded-full flex items-center justify-center">
+                    <span className="text-sm font-medium text-red-700 dark:text-red-300">!</span>
+                  </div>
+                  <div className="flex-1">
+                    <div className="text-sm font-medium text-red-600 dark:text-red-400">
+                      {userError ? 'เกิดข้อผิดพลาด' : 'ไม่พบข้อมูลผู้ใช้'}
+                    </div>
+                    <div className="text-xs text-gray-500 dark:text-gray-400">กรุณาเข้าสู่ระบบใหม่</div>
+                  </div>
+                </>
+              )}
               <Link 
                 href="/dashboard/settings"
-                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
               >
                 <span className="text-lg">⚙️</span>
               </Link>

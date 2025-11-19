@@ -1,7 +1,7 @@
 // User types
 export interface User {
   user_id: string;
-  name: string;
+  firstname: string;
   email: string;
   avatar_url?: string;
   created_at: string;
@@ -198,4 +198,24 @@ export interface CreateSharedGoalForm {
   target_amount: number;
   target_date: string;
   member_user_ids: string[];
+}
+
+// Types management
+export interface Type {
+  id: string | number;
+  name: string;
+  icon: string;
+  color: string;
+  description?: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface TypeFormData {
+  name: string;
+  icon: string;
+  color: string;
+  description?: string;
+  is_active?: boolean;
 }
