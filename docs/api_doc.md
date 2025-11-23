@@ -161,11 +161,11 @@ func New(
 	accountsGroup := api.Group("/accounts")
 	accountsGroup.GET("", accountsHandler.List)
 	accountsGroup.POST("", accountsHandler.Create)
+	accountsGroup.GET("/user/:userId", accountsHandler.GetByUser)
+	accountsGroup.GET("/share/:shareCode", accountsHandler.GetByShareCode)
 	accountsGroup.GET("/:id", accountsHandler.Get)
 	accountsGroup.PATCH("/:id", accountsHandler.Update)
 	accountsGroup.DELETE("/:id", accountsHandler.Delete)
-	accountsGroup.GET("/user/:userId", accountsHandler.GetByUser)
-	accountsGroup.GET("/share/:shareCode", accountsHandler.GetByShareCode)
 	accountsGroup.PATCH("/:id/balance", accountsHandler.UpdateBalance)
 
 	// Account Members endpoints

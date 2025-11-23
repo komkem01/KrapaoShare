@@ -5,6 +5,7 @@ import { NotificationProvider } from '@/contexts/NotificationContext';
 import { CategoryProvider } from '@/contexts/CategoryContext';
 import { TypeProvider } from '@/contexts/TypeContext';
 import { UserProvider } from '@/contexts/UserContext';
+import { AccountProvider } from '@/contexts/AccountContext';
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -35,7 +36,9 @@ export default function RootLayout({
           <NotificationProvider>
             <CategoryProvider>
               <TypeProvider>
-                {children}
+                <AccountProvider>
+                  {children}
+                </AccountProvider>
               </TypeProvider>
             </CategoryProvider>
           </NotificationProvider>
