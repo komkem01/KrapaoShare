@@ -25,9 +25,23 @@ function LoginContent() {
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [successMessage, setSuccessMessage] = useState("");
+  const [sessionExpiredMessage, setSessionExpiredMessage] = useState("");
 
   const googleCode = searchParams?.get("code");
   const googleState = searchParams?.get("state");
+
+  // Check for session expired message on component mount
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const message = sessionStorage.getItem("auth_message");
+      if (message) {
+        setSessionExpiredMessage(message);
+        sessionStorage.removeItem("auth_message");
+        // Auto-clear message after 5 seconds
+        setTimeout(() => setSessionExpiredMessage(""), 5000);
+      }
+    }
+  }, []);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -238,6 +252,15 @@ function LoginContent() {
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
+          {sessionExpiredMessage && (
+            <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-3 flex items-center space-x-2">
+              <svg className="w-5 h-5 text-yellow-600 dark:text-yellow-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <p className="text-sm text-yellow-700 dark:text-yellow-300">{sessionExpiredMessage}</p>
+            </div>
+          )}
+
           {errors.general && (
             <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3">
               <p className="text-sm text-red-600 dark:text-red-400">{errors.general}</p>

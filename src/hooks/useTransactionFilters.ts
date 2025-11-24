@@ -4,12 +4,10 @@ import type { Transaction, TransactionFilter } from '@/types/transaction';
 
 export interface UseTransactionFiltersOptions {
   initialFilters?: TransactionFilter;
-  autoFetch?: boolean;
 }
 
 export const useTransactionFilters = ({
   initialFilters = {},
-  autoFetch = true,
 }: UseTransactionFiltersOptions = {}) => {
   const { getTransactionsByUser, getTransactionsByAccount } = useTransactions();
   

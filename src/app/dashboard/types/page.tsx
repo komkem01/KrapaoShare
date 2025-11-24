@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import { useTypes, Type, TypeFormData } from '@/contexts/TypeContext';
+import { toast } from '@/utils/toast';
 
 const TypesPage: React.FC = () => {
   const {
@@ -79,7 +80,7 @@ const TypesPage: React.FC = () => {
 
   const handleSaveType = async () => {
     if (!typeForm.name.trim()) {
-      alert('กรุณากรอกชื่อประเภท');
+      toast.warning('ข้อมูลไม่ครบถ้วน', 'กรุณากรอกชื่อประเภท');
       return;
     }
 
@@ -88,8 +89,10 @@ const TypesPage: React.FC = () => {
     try {
       if (editingType) {
         await updateType(editingType.id, typeForm);
+        toast.success('แก้ไขประเภทสำเร็จ', `แก้ไขประเภท "${typeForm.name}" เรียบร้อยแล้ว`);
       } else {
         await addType(typeForm);
+        toast.success('เพิ่มประเภทสำเร็จ', `เพิ่มประเภท "${typeForm.name}" เรียบร้อยแล้ว`);
       }
 
       setShowModal(false);
@@ -106,7 +109,7 @@ const TypesPage: React.FC = () => {
       setTimeout(() => setShowSuccessMessage(false), 3000);
     } catch (error) {
       console.error('Failed to save type:', error);
-      alert(error instanceof Error ? error.message : 'ไม่สามารถบันทึกประเภทได้');
+      toast.error('เกิดข้อผิดพลาด', error instanceof Error ? error.message : 'ไม่สามารถบันทึกประเภทได้');
     } finally {
       setIsSaving(false);
     }
@@ -120,11 +123,12 @@ const TypesPage: React.FC = () => {
     setIsSaving(true);
     try {
       await deleteType(typeId);
+      toast.success('ลบประเภทสำเร็จ', `ลบประเภท "${typeName}" เรียบร้อยแล้ว`);
       setShowSuccessMessage(true);
       setTimeout(() => setShowSuccessMessage(false), 3000);
     } catch (error) {
       console.error('Failed to delete type:', error);
-      alert(error instanceof Error ? error.message : 'ไม่สามารถลบประเภทได้');
+      toast.error('เกิดข้อผิดพลาด', error instanceof Error ? error.message : 'ไม่สามารถลบประเภทได้');
     } finally {
       setIsSaving(false);
     }
@@ -141,11 +145,15 @@ const TypesPage: React.FC = () => {
         is_active: !type.is_active,
       });
       
+      toast.success(
+        !type.is_active ? 'เปิดใช้งานประเภทสำเร็จ' : 'ปิดใช้งานประเภทสำเร็จ',
+        `${!type.is_active ? 'เปิด' : 'ปิด'}ใช้งานประเภท "${type.name}" เรียบร้อยแล้ว`
+      );
       setShowSuccessMessage(true);
       setTimeout(() => setShowSuccessMessage(false), 3000);
     } catch (error) {
       console.error('Failed to toggle type status:', error);
-      alert(error instanceof Error ? error.message : 'ไม่สามารถเปลี่ยนสถานะประเภทได้');
+      toast.error('เกิดข้อผิดพลาด', error instanceof Error ? error.message : 'ไม่สามารถเปลี่ยนสถานะประเภทได้');
     } finally {
       setIsSaving(false);
     }

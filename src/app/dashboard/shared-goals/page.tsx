@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import DashboardLayout from '@/components/layout/DashboardLayout';
+import { toast } from 'sonner';
 
 export default function SharedGoalsPage() {
   const router = useRouter();
@@ -227,9 +228,9 @@ export default function SharedGoalsPage() {
     if (foundGoal) {
       // TODO: เพิ่มผู้ใช้เข้ากลุ่ม
       console.log('Joining group:', foundGoal.id, 'Code:', joinGroupCode);
-      alert(`เข้าร่วมกลุ่ม "${foundGoal.name}" สำเร็จ!`);
+      toast.info(`เข้าร่วมกลุ่ม "${foundGoal.name}" สำเร็จ!`);
     } else {
-      alert('ไม่พบกลุ่มที่ตรงกับรหัสนี้');
+      toast.info('ไม่พบกลุ่มที่ตรงกับรหัสนี้');
     }
     
     // รีเซ็ตฟอร์ม

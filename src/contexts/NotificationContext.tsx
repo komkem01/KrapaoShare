@@ -199,11 +199,31 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
       return;
     }
 
+    // Map frontend types to backend types
+    const mapTypeToBackend = (type: 'info' | 'warning' | 'error' | 'success'): string => {
+      switch (type) {
+        case 'success':
+        case 'info':
+          return 'system';
+        case 'error':
+        case 'warning':
+          return 'system';
+        default:
+          return 'system';
+      }
+    };
+
     try {
       const newNotification = await notificationApi.create({
-        user_id: userId,
-        ...notificationData,
-        priority: notificationData.priority || 'normal'
+        userId: userId, // Use camelCase
+        title: notificationData.title,
+        message: notificationData.message,
+        type: mapTypeToBackend(notificationData.type), // Map to backend type
+        priority: notificationData.priority || 'normal',
+        icon: notificationData.icon,
+        data: notificationData.data,
+        actionUrl: notificationData.action_url, // Use camelCase
+        expiresAt: notificationData.expires_at ? new Date(notificationData.expires_at).toISOString() : undefined
       }) as Notification;
       
       // Add backward compatibility properties

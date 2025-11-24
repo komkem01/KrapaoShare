@@ -1,12 +1,18 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import { Toaster } from 'sonner';
 import { NotificationProvider } from '@/contexts/NotificationContext';
 import { CategoryProvider } from '@/contexts/CategoryContext';
 import { TypeProvider } from '@/contexts/TypeContext';
 import { UserProvider } from '@/contexts/UserContext';
 import { AccountProvider } from '@/contexts/AccountContext';
 import { TransactionProvider } from '@/contexts/TransactionContext';
+import { BudgetProvider } from '@/contexts/BudgetContext';
+import { BillProvider } from '@/contexts/BillContext';
+import { GoalProvider } from '@/contexts/GoalContext';
+import { SharedGoalProvider } from '@/contexts/SharedGoalContext';
+import { DebtProvider } from '@/contexts/DebtContext';
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -33,13 +39,37 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
+        <Toaster 
+          position="top-right" 
+          richColors 
+          closeButton
+          theme="light"
+          toastOptions={{
+            style: {
+              padding: '16px',
+              borderRadius: '12px',
+              fontSize: '14px',
+              fontWeight: '500',
+            },
+          }}
+        />
         <UserProvider>
           <NotificationProvider>
             <CategoryProvider>
               <TypeProvider>
                 <AccountProvider>
                   <TransactionProvider>
-                    {children}
+                    <BudgetProvider>
+                      <BillProvider>
+                        <GoalProvider>
+                          <SharedGoalProvider>
+                            <DebtProvider>
+                              {children}
+                            </DebtProvider>
+                          </SharedGoalProvider>
+                        </GoalProvider>
+                      </BillProvider>
+                    </BudgetProvider>
                   </TransactionProvider>
                 </AccountProvider>
               </TypeProvider>

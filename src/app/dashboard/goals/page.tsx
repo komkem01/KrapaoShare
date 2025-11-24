@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import AccountSelector, { Account } from '@/components/ui/AccountSelector';
+import { toast } from '@/utils/toast';
 
 // Types
 interface Deposit {
@@ -168,7 +169,7 @@ export default function GoalsPage() {
 
   const handleCreateGoal = () => {
     if (!newGoal.name || !newGoal.targetAmount || !newGoal.targetDate) {
-      alert('กรุณากรอกข้อมูลให้ครบถ้วน');
+      toast.warning('ข้อมูลไม่ครบถ้วน', 'กรุณากรอกข้อมูลให้ครบถ้วน');
       return;
     }
 
@@ -193,12 +194,12 @@ export default function GoalsPage() {
       description: '',
       category: 'ทั่วไป'
     });
-    alert('สร้างเป้าหมายใหม่สำเร็จ! 🎯');
+    toast.success('สร้างเป้าหมายสำเร็จ! 🎯', `เป้าหมาย "${newGoal.name}" ถูกสร้างเรียบร้อยแล้ว`);
   };
 
   const handleDeposit = () => {
     if (!selectedGoal || !depositAmount) {
-      alert('กรุณากรอกจำนวนเงิน');
+      toast.warning('ข้อมูลไม่ครบถ้วน', 'กรุณากรอกจำนวนเงิน');
       return;
     }
 
@@ -206,12 +207,12 @@ export default function GoalsPage() {
     const selectedAccount = mockAccounts.find(acc => acc.id === selectedAccountId);
     
     if (!selectedAccount) {
-      alert('กรุณาเลือกบัญชี');
+      toast.error('ข้อมูลไม่ครบถ้วน', 'กรุณาเลือกบัญชี');
       return;
     }
 
     if (amount > selectedAccount.balance) {
-      alert(`ยอดเงินในบัญชีไม่เพียงพอ (คงเหลือ ฿${selectedAccount.balance.toLocaleString()})`);
+      toast.error('ยอดเงินไม่เพียงพอ', `ยอดเงินในบัญชีไม่เพียงพอ (คงเหลือ ฿${selectedAccount.balance.toLocaleString()})`);
       return;
     }
     const deposit: Deposit = {
@@ -232,7 +233,7 @@ export default function GoalsPage() {
         // Check if goal is completed
         if (newCurrentAmount >= goal.targetAmount && !goal.completedDate) {
           updatedGoal.completedDate = new Date().toISOString().split('T')[0];
-          setTimeout(() => alert('🎉 ยินดีด้วย! คุณบรรลุเป้าหมายแล้ว!'), 500);
+          setTimeout(() => toast.success('🎉 ยินดีด้วย!', 'คุณบรรลุเป้าหมายแล้ว!'), 500);
         }
         
         return updatedGoal;
@@ -244,7 +245,7 @@ export default function GoalsPage() {
     setDepositAmount('');
     setDepositNote('');
     setSelectedGoal(null);
-    alert('โอนเงินเข้าเป้าหมายสำเร็จ! 💰');
+    toast.success('โอนเงินสำเร็จ! 💰', `โอนเงิน ฿${amount.toLocaleString()} เข้าเป้าหมายเรียบร้อยแล้ว`);
   };
 
   const openDepositModal = (goal: Goal) => {
@@ -266,7 +267,7 @@ export default function GoalsPage() {
 
   const handleUpdateGoal = () => {
     if (!selectedGoal || !newGoal.name || !newGoal.targetAmount || !newGoal.targetDate) {
-      alert('กรุณากรอกข้อมูลให้ครบถ้วน');
+      toast.warning('ข้อมูลไม่ครบถ้วน', 'กรุณากรอกข้อมูลให้ครบถ้วน');
       return;
     }
 
@@ -293,7 +294,7 @@ export default function GoalsPage() {
       description: '',
       category: 'ทั่วไป'
     });
-    alert('แก้ไขเป้าหมายสำเร็จ! ✅');
+    toast.success('แก้ไขเป้าหมายสำเร็จ! ✅', `แก้ไขเป้าหมาย "${newGoal.name}" เรียบร้อยแล้ว`);
   };
 
   const handleViewDetails = (goalId: number) => {

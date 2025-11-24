@@ -27,6 +27,7 @@ export interface Category {
   icon: string;
   color: string;
   type: 'income' | 'expense'; // ประเภทหมวดหมู่ (รายรับ/รายจ่าย) จาก Backend
+  type_id?: string; // ประเภทเพิ่มเติม (optional) - foreign key to types table
   user_id?: string;
   description?: string;
   is_active?: boolean;
@@ -47,13 +48,17 @@ interface CategoryContextType {
 
 interface ApiCategory {
   id: string;
+  typeId?: string; // Backend ส่งมาเป็น camelCase
   user_id?: string;
+  userId?: string;
   icon?: string;
   color?: string;
   name: string;
-  type: 'income' | 'expense'; // Backend ส่งมาเป็น income หรือ expense
+  type?: 'income' | 'expense'; // Backend อาจไม่ส่ง ต้องหาจาก typeId
+  type_id?: string; // ประเภทเพิ่มเติม (optional)
   description?: string;
-  is_active: boolean;
+  is_active?: boolean;
+  isActive?: boolean;
 }
 
 interface CategoryListResponse {
@@ -69,16 +74,43 @@ const generateCategoryId = () => {
   return `${Date.now()}-${Math.random()}`;
 };
 
-const mapApiCategoryToLocal = (item: ApiCategory): Category => ({
-  id: item.id,
-  name: item.name,
-  type: item.type, // income หรือ expense จาก Backend
-  icon: item.icon ?? (item.type === 'income' ? '💰' : '💳'),
-  color: item.color ?? (item.type === 'income' ? '#22c55e' : '#ef4444'),
-  user_id: item.user_id,
-  description: item.description,
-  is_active: item.is_active,
-});
+const mapApiCategoryToLocal = (item: ApiCategory): Category | null => {
+  // Normalize fields (Backend อาจส่งมาเป็น camelCase หรือ snake_case)
+  const typeId = item.typeId || item.type_id;
+  const userId = item.userId || item.user_id;
+  const isActive = item.isActive ?? item.is_active ?? true;
+  
+  // ต้องมี typeId เพื่อกำหนด type (income/expense)
+  if (!typeId) {
+    console.warn('[CategoryContext] Category missing typeId:', item);
+    return null;
+  }
+  
+  // กำหนด type จาก item.type ถ้ามี หรือต้องหาจาก typeId
+  let categoryType: 'income' | 'expense';
+  
+  if (item.type === 'income' || item.type === 'expense') {
+    categoryType = item.type;
+  } else {
+    // Backend ไม่ส่ง type มา ต้องหาจาก external source
+    // จะต้อง inject types array เข้ามา หรือ hardcode
+    console.warn('[CategoryContext] Cannot determine type from typeId:', typeId);
+    // ใช้ค่า default เป็น expense
+    categoryType = 'expense';
+  }
+  
+  return {
+    id: item.id,
+    name: item.name,
+    type: categoryType,
+    type_id: typeId,
+    icon: item.icon ?? (categoryType === 'income' ? '💰' : '💳'),
+    color: item.color ?? (categoryType === 'income' ? '#22c55e' : '#ef4444'),
+    user_id: userId,
+    description: item.description,
+    is_active: isActive,
+  };
+};
 
 export function CategoryProvider({ children }: { children: ReactNode }) {
   const [categories, setCategories] = useState<CategoryState>({
@@ -141,16 +173,17 @@ export function CategoryProvider({ children }: { children: ReactNode }) {
       const metaMap: Record<string, ApiCategory> = {};
 
       remoteCategories.forEach((item) => {
-        // ใช้ field type จาก Backend โดยตรง
-        const group = item.type; // 'income' หรือ 'expense'
-        console.log('[CategoryContext] Processing category:', item.name, 'type:', item.type);
-
-        if (!group || (group !== 'income' && group !== 'expense')) {
-          console.warn(`[CategoryContext] Invalid category type for: ${item.name}, type: ${item.type}`);
+        const mapped = mapApiCategoryToLocal(item);
+        
+        if (!mapped) {
+          console.warn('[CategoryContext] Failed to map category:', item);
           return;
         }
+        
+        const group = mapped.type; // 'income' หรือ 'expense'
+        console.log('[CategoryContext] Processing category:', mapped.name, 'type:', mapped.type);
 
-        grouped[group].push(mapApiCategoryToLocal(item));
+        grouped[group].push(mapped);
         metaMap[item.id] = item;
       });
       
@@ -208,6 +241,8 @@ export function CategoryProvider({ children }: { children: ReactNode }) {
           color: category.color,
           name: category.name.trim(),
           is_active: true,
+          // ส่ง type_id เป็น null ถ้าเป็น empty string หรือ undefined
+          type_id: category.type_id && category.type_id.trim() !== '' ? category.type_id : null,
         };
 
         const created = await apiClient.post<ApiCategory>('/categories', payload);
@@ -220,6 +255,9 @@ export function CategoryProvider({ children }: { children: ReactNode }) {
               : cat
           ),
         }));
+        
+        // Refresh to sync with backend
+        await refreshCategories();
       } catch (err) {
         console.error('Failed to create category', err);
         setCategories((prev) => ({
@@ -227,9 +265,10 @@ export function CategoryProvider({ children }: { children: ReactNode }) {
           [type]: prev[type].filter((cat) => cat.id !== tempId),
         }));
         setError((err as Error).message ?? 'ไม่สามารถสร้างหมวดหมู่ได้');
+        throw err;
       }
     },
-    [userId]
+    [userId, refreshCategories]
   );
 
   const updateCategory = useCallback<
@@ -262,14 +301,22 @@ export function CategoryProvider({ children }: { children: ReactNode }) {
           color: updates.color ?? existingMeta?.color,
           type: updates.type ?? existingMeta?.type ?? currentCategory.type,
           is_active: existingMeta?.is_active ?? true,
+          // ส่ง type_id เป็น null ถ้าเป็น empty string หรือ undefined
+          type_id: updates.type_id !== undefined 
+            ? (updates.type_id && updates.type_id.trim() !== '' ? updates.type_id : null)
+            : (existingMeta?.type_id || null),
         };
 
         const updated = await apiClient.patch<ApiCategory>(`/categories/${categoryId}`, payload);
         setCategoryMeta((prev) => ({ ...prev, [categoryId]: updated }));
+        
+        // Refresh to sync with backend
+        await refreshCategories();
       } catch (err) {
         console.error('Failed to update category', err);
         setError((err as Error).message ?? 'ไม่สามารถอัปเดตหมวดหมู่ได้');
-        refreshCategories();
+        await refreshCategories();
+        throw err;
       }
     },
     [categoryMeta, refreshCategories, userId]
@@ -299,6 +346,9 @@ export function CategoryProvider({ children }: { children: ReactNode }) {
           delete next[categoryId];
           return next;
         });
+        
+        // Refresh to sync with backend
+        await refreshCategories();
       } catch (err) {
         console.error('Failed to delete category', err);
         setCategories((prev) => ({
@@ -306,9 +356,10 @@ export function CategoryProvider({ children }: { children: ReactNode }) {
           [type]: previousCategories,
         }));
         setError((err as Error).message ?? 'ไม่สามารถลบหมวดหมู่ได้');
+        throw err;
       }
     },
-    [userId]
+    [userId, refreshCategories]
   );
 
   const getCategoryById = useCallback<CategoryContextType['getCategoryById']>(

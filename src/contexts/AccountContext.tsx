@@ -84,6 +84,7 @@ const mapMemberPermissions = (member: AccountMemberResponse): AccountMember => (
 
 export interface AccountTransfer {
   id: string;
+  user_id: string;
   from_account_id: string;
   to_account_id: string;
   amount: number;
@@ -127,6 +128,7 @@ export interface UpdateBalanceRequest {
 }
 
 export interface CreateTransferRequest {
+  user_id: string;
   from_account_id: string;
   to_account_id: string;
   amount: number;
@@ -151,8 +153,8 @@ interface AccountContextType {
   
   // Member operations
   getAccountMembers: (accountId: string) => Promise<AccountMember[]>;
-  addMember: (accountId: string, userEmail: string, role: 'admin' | 'member', permissions: string[]) => Promise<AccountMember>;
-  updateMember: (memberId: string, permissions: string[]) => Promise<AccountMember>;
+  addMember: (accountId: string, userEmail: string, role: 'admin' | 'member', permissions: string[], invitedBy?: string) => Promise<AccountMember>;
+  updateMember: (memberId: string, role: 'admin' | 'member', permissions: string[]) => Promise<AccountMember>;
   removeMember: (memberId: string) => Promise<void>;
   
   // Transfer operations
@@ -359,7 +361,8 @@ export const AccountProvider: React.FC<AccountProviderProps> = ({ children }) =>
     accountId: string,
     userEmail: string,
     role: 'admin' | 'member',
-    permissions: string[]
+    permissions: string[],
+    invitedBy?: string
   ): Promise<AccountMember> => {
     try {
       const payload = {
@@ -367,6 +370,7 @@ export const AccountProvider: React.FC<AccountProviderProps> = ({ children }) =>
         user_email: userEmail,
         role,
         permissions: buildPermissionsPayload(permissions),
+        invited_by: invitedBy,
       };
 
       const member = await apiClient.post<AccountMemberResponse>('/account-members', payload);
@@ -386,10 +390,12 @@ export const AccountProvider: React.FC<AccountProviderProps> = ({ children }) =>
 
   const updateMember = useCallback(async (
     memberId: string,
+    role: 'admin' | 'member',
     permissions: string[]
   ): Promise<AccountMember> => {
     try {
       const payload = {
+        role,
         permissions: buildPermissionsPayload(permissions),
       };
 

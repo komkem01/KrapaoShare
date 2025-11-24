@@ -308,9 +308,40 @@ export interface AccountMember {
   account_name?: string;
 }
 
+// Account Transaction types (Deposit/Withdraw)
+export type AccountTransactionType = 'deposit' | 'withdraw';
+
+export interface AccountTransaction {
+  id: string;
+  user_id: string;
+  account_id: string;
+  transaction_type: AccountTransactionType;
+  amount: number;
+  note?: string;
+  category_id?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateAccountTransactionForm {
+  user_id: string;
+  account_id: string;
+  transaction_type: AccountTransactionType;
+  amount: number;
+  note?: string;
+  category_id?: string;
+}
+
+export interface UpdateAccountTransactionForm {
+  amount?: number;
+  note?: string;
+  category_id?: string;
+}
+
 // Account Transfer types
 export interface AccountTransfer {
   id: string;
+  user_id: string;
   from_account_id: string;
   to_account_id: string;
   amount: number;

@@ -1,12 +1,13 @@
 "use client";
 
-import { getStoredTokens } from "./authStorage";
+import { getStoredTokens, setStoredTokens, clearAuthData } from "./authStorage";
 
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/api/v1";
 
 type RequestConfig = RequestInit & {
   skipAuth?: boolean;
+  _retry?: boolean; // Internal flag to prevent infinite retry loops
 };
 
 export class ApiError extends Error {
@@ -43,11 +44,72 @@ function unwrapResponse<T>(payload: unknown): T {
   return payload as T;
 }
 
+// Refresh token logic
+let isRefreshing = false;
+let failedQueue: Array<{
+  resolve: (token: string) => void;
+  reject: (error: Error) => void;
+}> = [];
+
+const processQueue = (error: Error | null, token: string | null = null) => {
+  failedQueue.forEach((prom) => {
+    if (error) {
+      prom.reject(error);
+    } else if (token) {
+      prom.resolve(token);
+    }
+  });
+
+  failedQueue = [];
+};
+
+async function refreshAccessToken(): Promise<string> {
+  const { refreshToken } = getStoredTokens();
+  
+  if (!refreshToken) {
+    throw new ApiError("No refresh token available", 401);
+  }
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/auth/refresh`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ refreshToken }),
+    });
+
+    if (!response.ok) {
+      throw new ApiError("Failed to refresh token", response.status);
+    }
+
+    const data = await response.json();
+    const tokenData = unwrapResponse<{
+      accessToken: string;
+      refreshToken: string;
+      expiresAt: string;
+    }>(data);
+
+    // Store new tokens
+    setStoredTokens(
+      tokenData.accessToken,
+      tokenData.refreshToken,
+      tokenData.expiresAt
+    );
+
+    return tokenData.accessToken;
+  } catch (error) {
+    // Clear auth data on refresh failure
+    clearAuthData();
+    throw error;
+  }
+}
+
 export async function apiRequest<T = unknown>(
   endpoint: string,
   options: RequestConfig = {}
 ): Promise<T> {
-  const { skipAuth, headers, ...rest } = options;
+  const { skipAuth, _retry, headers, ...rest } = options;
 
   const url = buildUrl(endpoint);
   const config: RequestInit = {
@@ -88,6 +150,51 @@ export async function apiRequest<T = unknown>(
       ? await response.json().catch(() => null)
       : await response.text()
     : null;
+
+  // Handle 401 Unauthorized - try to refresh token
+  if (response.status === 401 && !skipAuth && !_retry) {
+    if (isRefreshing) {
+      // Wait for the ongoing refresh to complete
+      try {
+        await new Promise<string>((resolve, reject) => {
+          failedQueue.push({ resolve, reject });
+        });
+        
+        // Retry original request with new token
+        return apiRequest<T>(endpoint, { ...options, _retry: true });
+      } catch {
+        throw new ApiError("Authentication failed", 401);
+      }
+    }
+
+    isRefreshing = true;
+
+    try {
+      const newAccessToken = await refreshAccessToken();
+      processQueue(null, newAccessToken);
+      isRefreshing = false;
+
+      // Retry the original request with new token
+      return apiRequest<T>(endpoint, { ...options, _retry: true });
+    } catch (error) {
+      processQueue(error as Error, null);
+      isRefreshing = false;
+      
+      // Clear all auth data
+      clearAuthData();
+      
+      // Redirect to login page with expired session message
+      if (typeof window !== "undefined") {
+        // Store message for login page to display
+        sessionStorage.setItem("auth_message", "เซสชันหมดอายุ กรุณาเข้าสู่ระบบใหม่อีกครั้ง");
+        
+        // Redirect to login
+        window.location.href = "/auth/login";
+      }
+      
+      throw new ApiError("Session expired. Please login again.", 401);
+    }
+  }
 
   if (!response.ok) {
     const message =
@@ -381,6 +488,39 @@ export const accountMemberApi = {
     apiClient.get(`/account-members/account/${accountId}/user/${userId}`),
 };
 
+// Account Transaction API functions (Deposit/Withdraw)
+export const accountTransactionApi = {
+  list: (filters?: {
+    user_id?: string;
+    account_id?: string;
+    transaction_type?: 'deposit' | 'withdraw';
+    category_id?: string;
+    start_date?: string;
+    end_date?: string;
+    page?: number;
+    limit?: number;
+  }) => apiClient.get(`/account-transactions${buildQueryParams(filters)}`),
+  
+  create: (data: {
+    user_id: string;
+    account_id: string;
+    transaction_type: 'deposit' | 'withdraw';
+    amount: number;
+    note?: string;
+    category_id?: string;
+  }) => apiClient.post('/account-transactions', data),
+  
+  getById: (id: string) => apiClient.get(`/account-transactions/${id}`),
+  
+  update: (id: string, data: {
+    amount?: number;
+    note?: string;
+    category_id?: string;
+  }) => apiClient.patch(`/account-transactions/${id}`, data),
+  
+  delete: (id: string) => apiClient.delete(`/account-transactions/${id}`),
+};
+
 // Account Transfer API functions
 export const accountTransferApi = {
   list: (filters?: {
@@ -457,15 +597,15 @@ export const notificationApi = {
   }) => apiClient.get(`/notifications${buildQueryParams(filters)}`),
   
   create: (data: {
-    user_id: string;
+    userId: string;
     title: string;
     message: string;
-    type: 'info' | 'warning' | 'error' | 'success';
+    type: string; // Backend expects 'transaction' | 'bill' | 'budget' | 'goal' | 'debt' | 'reminder' | 'system'
     priority?: 'low' | 'normal' | 'high' | 'urgent';
     icon?: string;
     data?: Record<string, unknown>;
-    action_url?: string;
-    expires_at?: string;
+    actionUrl?: string;
+    expiresAt?: string;
   }) => apiClient.post('/notifications', data),
   
   getById: (id: string) => apiClient.get(`/notifications/${id}`),
@@ -846,6 +986,43 @@ export const recurringBillApi = {
   }) => apiClient.patch(`/recurring-bills/${id}`, data),
   
   delete: (id: string) => apiClient.delete(`/recurring-bills/${id}`),
+};
+
+// Audit Log API functions
+export const auditLogApi = {
+  list: (filters?: {
+    user_id?: string;
+    action?: string;
+    table_name?: string;
+    record_id?: string;
+    page?: number;
+    limit?: number;
+  }) => apiClient.get(`/audit-logs${buildQueryParams(filters)}`),
+  
+  create: (data: {
+    userId?: string;
+    action: string;
+    tableName: string;
+    recordId: string;
+    oldValues?: Record<string, unknown>;
+    newValues?: Record<string, unknown>;
+    ipAddress?: string;
+    userAgent?: string;
+  }) => apiClient.post('/audit-logs', data),
+  
+  getById: (id: string) => apiClient.get(`/audit-logs/${id}`),
+  
+  update: (id: string, data: {
+    action?: string;
+    tableName?: string;
+    recordId?: string;
+    oldValues?: Record<string, unknown>;
+    newValues?: Record<string, unknown>;
+    ipAddress?: string;
+    userAgent?: string;
+  }) => apiClient.patch(`/audit-logs/${id}`, data),
+  
+  delete: (id: string) => apiClient.delete(`/audit-logs/${id}`),
 };
 
 // Health Check API functions

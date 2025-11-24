@@ -216,10 +216,11 @@ export default function NotificationPanel({
                 {paginatedNotifications.map((notification) => (
                 <div
                   key={notification.id}
-                  className={`relative rounded-lg border p-3 transition-all duration-200 backdrop-blur-sm ${
+                  onClick={() => !notification.is_read && onMarkAsRead(notification.id)}
+                  className={`relative rounded-lg border p-3 transition-all duration-200 backdrop-blur-sm cursor-pointer hover:shadow-md ${
                     notification.is_read
                       ? 'bg-white/70 dark:bg-gray-800/70 border-gray-200/50 dark:border-gray-700/50'
-                      : 'bg-gray-100/80 dark:bg-gray-700/80 border-gray-300/60 dark:border-gray-600/60'
+                      : 'bg-gray-100/80 dark:bg-gray-700/80 border-gray-300/60 dark:border-gray-600/60 hover:bg-gray-200/80 dark:hover:bg-gray-600/80'
                   }`}
                 >
                   {/* Unread indicator */}
@@ -243,18 +244,58 @@ export default function NotificationPanel({
                           <p className="text-sm text-gray-600 dark:text-gray-400 mt-1 font-light leading-relaxed">
                             {notification.message}
                           </p>
-                          <p className="text-xs text-gray-500 dark:text-gray-500 mt-2 font-light">
-                            {formatTimestamp(notification.created_at)}
-                          </p>
+                          <div className="flex items-center justify-between mt-2">
+                            <p className="text-xs text-gray-500 dark:text-gray-500 font-light">
+                              {formatTimestamp(notification.created_at)}
+                            </p>
+                            {notification.is_read && notification.read_at && (
+                              <p className="text-xs text-green-600 dark:text-green-400 font-light">
+                                อ่านแล้ว
+                              </p>
+                            )}
+                          </div>
                         </div>
 
-                        {/* Type indicator */}
-                        <span className="text-xs ml-2 mt-1">{getNotificationIcon(notification.type)}</span>
+                        {/* Action buttons */}
+                        <div className="flex items-center space-x-1 ml-2">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              notification.is_read ? null : onMarkAsRead(notification.id);
+                            }}
+                            className={`p-1 rounded-full transition-colors ${
+                              notification.is_read 
+                                ? 'text-green-500 dark:text-green-400' 
+                                : 'text-gray-400 hover:text-green-500 dark:hover:text-green-400'
+                            }`}
+                            title={notification.is_read ? 'อ่านแล้ว' : 'ทำเครื่องหมายว่าอ่านแล้ว'}
+                          >
+                            {notification.is_read ? '✓' : '○'}
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onDeleteNotification(notification.id);
+                            }}
+                            className="p-1 text-gray-400 hover:text-red-500 dark:hover:text-red-400 transition-colors"
+                            title="ลบการแจ้งเตือน"
+                          >
+                            ×
+                          </button>
+                        </div>
                       </div>
 
                       {/* Action Button */}
                       {notification.action_url && (
-                        <button className="mt-2 text-xs text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white font-light transition-colors">
+                        <button 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (notification.action_url) {
+                              window.location.href = notification.action_url;
+                            }
+                          }}
+                          className="mt-2 text-xs text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 font-light transition-colors"
+                        >
                           ดูรายละเอียด →
                         </button>
                       )}

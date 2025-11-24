@@ -6,6 +6,7 @@ import { useTransactions } from '@/contexts/TransactionContext';
 import { useAccounts } from '@/contexts/AccountContext';
 import { useCategories } from '@/contexts/CategoryContext';
 import type { Transaction } from '@/types/transaction';
+import { toast } from 'sonner';
 
 export default function AnalyticsPage() {
   const { transactions, isLoading: transactionsLoading, refreshTransactions } = useTransactions();
@@ -204,17 +205,17 @@ export default function AnalyticsPage() {
 
   const handleViewLastYear = () => {
     // In a real app, this would fetch last year's data
-    alert('ฟีเจอร์นี้จะแสดงข้อมูลปีก่อนหน้า กำลังพัฒนา...');
+    toast.info('ฟีเจอร์นี้จะแสดงข้อมูลปีก่อนหน้า กำลังพัฒนา...');
   };
 
   const handleCreateGoal = async () => {
     if (!newGoal.name || !newGoal.target || !newGoal.deadline) {
-      alert('กรุณากรอกข้อมูลให้ครบถ้วน');
+      toast.info('กรุณากรอกข้อมูลให้ครบถ้วน');
       return;
     }
 
     if (parseFloat(newGoal.target) <= 0) {
-      alert('เป้าหมายต้องมากกว่า 0');
+      toast.info('เป้าหมายต้องมากกว่า 0');
       return;
     }
 

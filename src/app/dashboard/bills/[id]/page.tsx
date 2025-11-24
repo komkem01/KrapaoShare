@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import DashboardLayout from '@/components/layout/DashboardLayout';
+import { toast } from 'sonner';
 
 // Types
 interface BillMember {
@@ -206,7 +207,7 @@ export default function BillDetailPage({ params }: PageProps) {
     const unpaidMembers = bill?.members.filter(m => !m.paid && m.name !== 'คุณ');
     if (unpaidMembers && unpaidMembers.length > 0) {
       setShowReminderModal(false);
-      alert('ส่งการแจ้งเตือนเรียบร้อยแล้ว! 📱');
+      toast.info('ส่งการแจ้งเตือนเรียบร้อยแล้ว! 📱');
     }
   };
 
@@ -231,7 +232,7 @@ export default function BillDetailPage({ params }: PageProps) {
 
   const handleUpdateBill = () => {
     if (!editingBill || !editingBill.title || !editingBill.totalAmount) {
-      alert('กรุณากรอกข้อมูลให้ครบถ้วน');
+      toast.info('กรุณากรอกข้อมูลให้ครบถ้วน');
       return;
     }
 
@@ -255,7 +256,7 @@ export default function BillDetailPage({ params }: PageProps) {
       // กำหนดจำนวนเองแต่ละคน
       const memberAmountsSum = Object.values(editingBill.memberAmounts).reduce((sum, amount) => sum + amount, 0);
       if (Math.abs(memberAmountsSum - totalAmount) > 0.01) {
-        alert(`ยอดรวมไม่ตรงกัน! ยอดที่กรอก: ฿${memberAmountsSum.toLocaleString()} ยอดรวมที่ระบุ: ฿${totalAmount.toLocaleString()}`);
+        toast.info(`ยอดรวมไม่ตรงกัน! ยอดที่กรอก: ฿${memberAmountsSum.toLocaleString()} ยอดรวมที่ระบุ: ฿${totalAmount.toLocaleString()}`);
         return;
       }
 
@@ -279,7 +280,7 @@ export default function BillDetailPage({ params }: PageProps) {
 
     setShowEditModal(false);
     setEditingBill(null);
-    alert('แก้ไขบิลเรียบร้อยแล้ว! ✅');
+    toast.info('แก้ไขบิลเรียบร้อยแล้ว! ✅');
   };
 
   // Loading state
@@ -717,7 +718,7 @@ export default function BillDetailPage({ params }: PageProps) {
                   <div className="absolute inset-0 bg-white opacity-0 group-hover:opacity-20 rounded-xl transition-opacity duration-300"></div>
                 </button>
                 <button 
-                  onClick={() => alert('คุณสามารถส่งลิงก์บิลนี้ให้เพื่อนเพื่อให้ดูรายละเอียดและยืนยันการจ่ายเงินได้ ✨ เพื่อนจะสามารถกดปุ่ม "✅ จ่ายแล้ว" เพื่อยืนยันการจ่ายเงินของตัวเองได้')}
+                  onClick={() => toast.info('คุณสามารถส่งลิงก์บิลนี้ให้เพื่อนเพื่อให้ดูรายละเอียดและยืนยันการจ่ายเงินได้ ✨ เพื่อนจะสามารถกดปุ่ม "✅ จ่ายแล้ว" เพื่อยืนยันการจ่ายเงินของตัวเองได้')}
                   className="group relative flex-1 bg-white dark:bg-gray-800 border-2 border-orange-300 dark:border-orange-600 text-orange-700 dark:text-orange-300 py-3 px-6 rounded-xl hover:border-orange-400 dark:hover:border-orange-500 hover:bg-orange-50 dark:hover:bg-orange-900 transition-all duration-300 font-bold shadow-lg hover:shadow-xl transform hover:scale-[1.02]"
                 >
                   <span className="flex items-center justify-center space-x-2">

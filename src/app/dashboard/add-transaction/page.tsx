@@ -5,15 +5,16 @@ import { useRouter } from 'next/navigation';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import CategorySelector, { useCategorySelector } from '@/components/ui/CategorySelector';
 import { useNotifications } from '@/contexts/NotificationContext';
-import { useAccounts } from '@/contexts/AccountContext';
+import { useAccounts, type Account } from '@/contexts/AccountContext';
 import { useTransactions } from '@/contexts/TransactionContext';
 import { getStoredUser } from '@/utils/authStorage';
+import { accountTransactionApi } from '@/utils/apiClient';
 import type { CreateTransactionRequest } from '@/types/transaction';
 
 export default function AddTransactionPage() {
   const router = useRouter();
   const { addNotification } = useNotifications();
-  const { accounts, refreshAccounts, isLoading: accountsLoading } = useAccounts();
+  const { accounts, refreshAccounts, updateBalance, isLoading: accountsLoading } = useAccounts();
   const { createTransaction } = useTransactions();
   
   const [activeTab, setActiveTab] = useState<'expense' | 'income'>('expense');
@@ -29,13 +30,43 @@ export default function AddTransactionPage() {
 
   // Load accounts on mount
   useEffect(() => {
-    refreshAccounts();
+    console.log('Loading accounts...');
+    refreshAccounts().catch(err => {
+      console.error('Failed to refresh accounts:', err);
+    });
   }, [refreshAccounts]);
 
-  const selectedAccount = accounts.find(acc => acc.id === selectedAccountId);
+  // Debug logging
+  useEffect(() => {
+    console.log('Accounts state:', accounts);
+    console.log('Accounts loading:', accountsLoading);
+  }, [accounts, accountsLoading]);
+
+  const safeAccounts = (accounts ?? []).filter(
+    (account): account is Account => Boolean(account && account.id)
+  );
+
+  useEffect(() => {
+    if (accounts && accounts.some(account => !account || !account.id)) {
+      console.warn('Detected invalid account entries from API response:', accounts);
+    }
+  }, [accounts]);
+
+  const selectedAccount = safeAccounts.find(acc => acc.id === selectedAccountId);
   const currentCategory = activeTab === 'expense' ? expenseCategory : incomeCategory;
 
   const handleSubmit = async () => {
+    // ตรวจสอบว่าข้อมูลบัญชีโหลดเสร็จแล้ว
+    if (accountsLoading || !accounts) {
+      await addNotification({
+        title: 'กำลังโหลดข้อมูล',
+        message: 'กรุณารอสักครู่ ระบบกำลังโหลดข้อมูลบัญชี',
+        type: 'warning',
+        priority: 'normal'
+      });
+      return;
+    }
+
     // Validation
     if (!selectedAccountId) {
       await addNotification({
@@ -77,8 +108,9 @@ export default function AddTransactionPage() {
       return;
     }
 
-    // ตรวจสอบยอดเงินสำหรับรายจ่าย
-    if (activeTab === 'expense' && selectedAccount && selectedAccount.current_balance < parseFloat(amount)) {
+    // ตรวจสอบยอดเงินสำหรับรายจ่าย (ใช้ข้อมูลล่าสุด)
+  const latestAccount = safeAccounts.find(acc => acc.id === selectedAccountId);
+    if (activeTab === 'expense' && latestAccount && latestAccount.current_balance < parseFloat(amount)) {
       await addNotification({
         title: 'ยอดเงินไม่เพียงพอ',
         message: 'ยอดเงินในบัญชีไม่เพียงพอสำหรับรายการนี้',
@@ -110,6 +142,26 @@ export default function AddTransactionPage() {
 
       const result = await createTransaction(transactionPayload);
       console.log('Transaction created:', result);
+
+      // Create account transaction record and update balance
+      if (selectedAccountId) {
+        // Create account transaction record first
+        await accountTransactionApi.create({
+          user_id: storedUser.id,
+          account_id: selectedAccountId,
+          transaction_type: activeTab === 'expense' ? 'withdraw' : 'deposit',
+          amount: parseFloat(amount),
+          note: `${activeTab === 'expense' ? 'รายจ่าย' : 'รายรับ'}: ${description.trim()}`,
+          category_id: currentCategory.selectedCategory?.id
+        });
+
+        // Then update account balance
+        await updateBalance(selectedAccountId, {
+          amount: parseFloat(amount),
+          operation: activeTab === 'expense' ? 'subtract' : 'add',
+          note: `${activeTab === 'expense' ? 'รายจ่าย' : 'รายรับ'}: ${description.trim()}`
+        });
+      }
 
       // Refresh accounts to update balances after transaction
       await refreshAccounts();
@@ -203,6 +255,10 @@ export default function AddTransactionPage() {
                 <div className="w-full px-4 py-3 border border-gray-200 dark:border-gray-600 rounded-xl bg-gray-50 dark:bg-gray-700 text-gray-500 dark:text-gray-400">
                   กำลังโหลดบัญชี...
                 </div>
+              ) : safeAccounts.length === 0 ? (
+                <div className="w-full px-4 py-3 border border-gray-200 dark:border-gray-600 rounded-xl bg-gray-50 dark:bg-gray-700 text-gray-500 dark:text-gray-400">
+                  ไม่พบบัญชี กรุณาเพิ่มบัญชีก่อนทำรายการ
+                </div>
               ) : (
                 <select
                   value={selectedAccountId || ''}
@@ -210,7 +266,7 @@ export default function AddTransactionPage() {
                   className="w-full px-4 py-3 border border-gray-200 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 >
                   <option value="">เลือกบัญชีที่ต้องการทำรายการ</option>
-                  {accounts.map((account) => (
+                  {safeAccounts.map((account) => (
                     <option key={account.id} value={account.id}>
                       {account.name} (฿{account.current_balance.toLocaleString()})
                     </option>
@@ -279,9 +335,9 @@ export default function AddTransactionPage() {
             {/* Submit Button */}
             <button
               onClick={handleSubmit}
-              disabled={isSubmitting}
+              disabled={isSubmitting || accountsLoading || safeAccounts.length === 0}
               className={`w-full py-3 rounded-xl font-medium transition-all ${
-                isSubmitting
+                isSubmitting || accountsLoading || safeAccounts.length === 0
                   ? 'bg-gray-300 dark:bg-gray-600 text-gray-500 dark:text-gray-400 cursor-not-allowed'
                   : activeTab === 'expense'
                   ? 'bg-red-500 hover:bg-red-600 text-white shadow-md hover:shadow-lg'
@@ -295,6 +351,14 @@ export default function AddTransactionPage() {
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                   </svg>
                   กำลังบันทึก...
+                </span>
+              ) : accountsLoading ? (
+                <span className="flex items-center justify-center">
+                  <svg className="animate-spin -ml-1 mr-3 h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  กำลังโหลด...
                 </span>
               ) : (
                 `บันทึก${activeTab === 'expense' ? 'รายจ่าย' : 'รายรับ'}`
