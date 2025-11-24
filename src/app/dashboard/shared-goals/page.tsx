@@ -18,6 +18,23 @@ export default function SharedGoalsPage() {
     return result;
   };
 
+  // TODO: ✅ Backend API Ready!
+  // Backend now has /shared-goals and /shared-goal-members endpoints - integrate with real API:
+  //   GET    /shared-goals                                  - List shared goals
+  //   POST   /shared-goals                                  - Create shared goal
+  //   GET    /shared-goals/:id                              - Get goal details
+  //   PATCH  /shared-goals/:id                              - Update goal
+  //   DELETE /shared-goals/:id                              - Delete goal
+  //   GET    /shared-goal-members                           - List members
+  //   POST   /shared-goal-members                           - Add member
+  //   GET    /shared-goal-members/goal/:goalId              - Get goal members
+  //   GET    /shared-goal-members/user/:userId              - Get user's goals
+  //   GET    /shared-goal-members/goal/:goalId/user/:userId - Get specific membership
+  //   GET    /goal-contributions/goal/:goalId               - Get contributions
+  //   POST   /goal-contributions                            - Add contribution
+  //
+  // See src/utils/apiClient.ts for implementation
+  
   // Mock data - ในอนาคตจะเชื่อมกับ API
   const mockMyGoals = [
     {

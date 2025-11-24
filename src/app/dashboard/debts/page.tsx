@@ -21,6 +21,22 @@ export default function DebtsPage() {
   const [showStatsModal, setShowStatsModal] = useState(false);
   const [selectedDebt, setSelectedDebt] = useState<Debt | null>(null);
 
+  // TODO: ✅ Backend API Ready!
+  // Backend now has /debts and /debt-payments endpoints - integrate with real API:
+  //   GET    /debts                    - List debts
+  //   POST   /debts                    - Create debt
+  //   GET    /debts/:id                - Get debt details
+  //   PATCH  /debts/:id                - Update debt (mark settled)
+  //   DELETE /debts/:id                - Delete debt
+  //   GET    /debts/creditor/:userId   - Debts where user is creditor
+  //   GET    /debts/debtor/:userId     - Debts where user is debtor
+  //   GET    /debt-payments            - List payments
+  //   POST   /debt-payments            - Record payment
+  //   GET    /debt-payments/debt/:debtId - Get debt payments
+  //   GET    /debt-payments/user/:userId - Get user's payments
+  //
+  // See src/utils/apiClient.ts for implementation
+
   // Mock data - ในอนาคตจะเชื่อมกับ API
   const [mockDebtorsOweMe, setMockDebtorsOweMe] = useState<Debt[]>([
     {

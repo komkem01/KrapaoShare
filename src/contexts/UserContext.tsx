@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { User } from '@/types';
-import { apiClient } from '@/utils/apiClient';
+import { authApi } from '@/utils/apiClient';
 import { getStoredUser, setStoredUser, clearAuthData } from '@/utils/authStorage';
 
 interface UserContextType {
@@ -36,7 +36,7 @@ export function UserProvider({ children }: UserProviderProps) {
       }
 
       // ดึงข้อมูลล่าสุดจาก API
-      const userData = await apiClient.get<User>('/auth/me');
+      const userData = await authApi.me() as User;
       setUser(userData);
       setStoredUser(userData as unknown as Record<string, unknown>);
     } catch (err) {
@@ -53,7 +53,22 @@ export function UserProvider({ children }: UserProviderProps) {
   };
 
   const refreshUser = async () => {
-    await fetchUser();
+    try {
+      setError(null);
+      
+      // ดึงข้อมูลล่าสุดจาก API
+      const userData = await authApi.me() as User;
+      setUser(userData);
+      setStoredUser(userData as unknown as Record<string, unknown>);
+    } catch (err) {
+      console.error('Error refreshing user:', err);
+      setError(err instanceof Error ? err.message : 'เกิดข้อผิดพลาดในการดึงข้อมูลผู้ใช้');
+      
+      // หากเกิดข้อผิดพลาดในการดึงข้อมูล อาจเป็นเพราะ token หมดอายุ
+      if (err instanceof Error && err.message.includes('401')) {
+        logout();
+      }
+    }
   };
 
   const logout = () => {

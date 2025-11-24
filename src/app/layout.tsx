@@ -6,6 +6,7 @@ import { CategoryProvider } from '@/contexts/CategoryContext';
 import { TypeProvider } from '@/contexts/TypeContext';
 import { UserProvider } from '@/contexts/UserContext';
 import { AccountProvider } from '@/contexts/AccountContext';
+import { TransactionProvider } from '@/contexts/TransactionContext';
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -37,7 +38,9 @@ export default function RootLayout({
             <CategoryProvider>
               <TypeProvider>
                 <AccountProvider>
-                  {children}
+                  <TransactionProvider>
+                    {children}
+                  </TransactionProvider>
                 </AccountProvider>
               </TypeProvider>
             </CategoryProvider>

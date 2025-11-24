@@ -1,17 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-
-export interface Notification {
-  id: string;
-  type: 'success' | 'warning' | 'info' | 'error';
-  title: string;
-  message: string;
-  timestamp: Date;
-  isRead: boolean;
-  category: 'transaction' | 'bill' | 'debt' | 'budget' | 'goal' | 'system';
-  actionUrl?: string;
-}
+import { Notification } from '@/types';
 
 interface NotificationPanelProps {
   isOpen: boolean;
@@ -84,7 +74,8 @@ export default function NotificationPanel({
     }
   };
 
-  const formatTimestamp = (timestamp: Date) => {
+  const formatTimestamp = (created_at: string) => {
+    const timestamp = new Date(created_at);
     const now = new Date();
     const diff = now.getTime() - timestamp.getTime();
     const minutes = Math.floor(diff / (1000 * 60));
@@ -98,26 +89,45 @@ export default function NotificationPanel({
     return timestamp.toLocaleDateString('th-TH');
   };
 
-  const unreadCount = notifications.filter(n => !n.isRead).length;
+  // Helper function to get category from notification data or type
+  const getNotificationCategory = (notification: Notification): string => {
+    // Try to get category from data object first
+    if (notification.data && typeof notification.data.category === 'string') {
+      return notification.data.category;
+    }
+    // Otherwise infer from type or title
+    if (notification.title.includes('รายการ') || notification.title.includes('Transaction')) {
+      return 'transaction';
+    }
+    if (notification.title.includes('ใบแจ้ง') || notification.title.includes('Bill')) {
+      return 'bill';
+    }
+    if (notification.title.includes('เป้าหมาย') || notification.title.includes('Goal')) {
+      return 'goal';
+    }
+    return 'system';
+  };
+
+  const unreadCount = notifications.filter(n => !n.is_read).length;
   
   // Filter notifications based on selected filter
   const filteredNotifications = notifications.filter(notification => {
     switch (filterType) {
       case 'unread':
-        return !notification.isRead;
+        return !notification.is_read;
       case 'transaction':
-        return notification.category === 'transaction';
+        return getNotificationCategory(notification) === 'transaction';
       case 'bill':
-        return notification.category === 'bill';
+        return getNotificationCategory(notification) === 'bill';
       case 'goal':
-        return notification.category === 'goal';
+        return getNotificationCategory(notification) === 'goal';
       default:
         return true;
     }
   });
 
   const sortedNotifications = [...filteredNotifications].sort((a, b) => 
-    b.timestamp.getTime() - a.timestamp.getTime()
+    new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
   );
 
   // Pagination logic
@@ -207,20 +217,20 @@ export default function NotificationPanel({
                 <div
                   key={notification.id}
                   className={`relative rounded-lg border p-3 transition-all duration-200 backdrop-blur-sm ${
-                    notification.isRead
+                    notification.is_read
                       ? 'bg-white/70 dark:bg-gray-800/70 border-gray-200/50 dark:border-gray-700/50'
                       : 'bg-gray-100/80 dark:bg-gray-700/80 border-gray-300/60 dark:border-gray-600/60'
                   }`}
                 >
                   {/* Unread indicator */}
-                  {!notification.isRead && (
+                  {!notification.is_read && (
                     <div className="absolute left-2 top-2 w-2 h-2 bg-red-500 rounded-full"></div>
                   )}
 
                   <div className="flex items-start space-x-3">
                     {/* Icon */}
                     <div className="flex-shrink-0 mt-1">
-                      <span className="text-lg">{getCategoryIcon(notification.category)}</span>
+                      <span className="text-lg">{getCategoryIcon(getNotificationCategory(notification))}</span>
                     </div>
 
                     {/* Content */}
@@ -234,7 +244,7 @@ export default function NotificationPanel({
                             {notification.message}
                           </p>
                           <p className="text-xs text-gray-500 dark:text-gray-500 mt-2 font-light">
-                            {formatTimestamp(notification.timestamp)}
+                            {formatTimestamp(notification.created_at)}
                           </p>
                         </div>
 
@@ -243,7 +253,7 @@ export default function NotificationPanel({
                       </div>
 
                       {/* Action Button */}
-                      {notification.actionUrl && (
+                      {notification.action_url && (
                         <button className="mt-2 text-xs text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white font-light transition-colors">
                           ดูรายละเอียด →
                         </button>

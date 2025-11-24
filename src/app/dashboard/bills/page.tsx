@@ -49,6 +49,21 @@ export default function BillsPage() {
 
   const itemsPerPage = 4;
 
+  // TODO: ✅ Backend API Ready!
+  // Backend now has /bills and /bill-participants endpoints - integrate with real API:
+  //   GET    /bills                           - List bills
+  //   POST   /bills                           - Create bill
+  //   GET    /bills/:id                       - Get bill details
+  //   PATCH  /bills/:id                       - Update bill
+  //   DELETE /bills/:id                       - Delete bill
+  //   GET    /bill-participants               - List participants
+  //   POST   /bill-participants               - Add participant
+  //   GET    /bill-participants/bill/:billId  - Get bill participants
+  //   GET    /bill-participants/user/:userId  - Get user's bills
+  //   PATCH  /bill-participants/:id           - Update participant (mark paid)
+  //
+  // See src/utils/apiClient.ts for implementation
+
   // Mock data - ในอนาคตจะเชื่อมกับ API
   const [mockActiveBills, setMockActiveBills] = useState([
     {

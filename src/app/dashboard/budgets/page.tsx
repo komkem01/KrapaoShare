@@ -41,6 +41,16 @@ export default function BudgetsPage() {
     description: ''
   });
 
+  // TODO: ✅ Backend API Ready! 
+  // Backend now has /budgets endpoints - integrate with real API:
+  //   GET    /budgets                  - List budgets
+  //   POST   /budgets                  - Create budget
+  //   GET    /budgets/:id              - Get budget details
+  //   PATCH  /budgets/:id              - Update budget
+  //   DELETE /budgets/:id              - Delete budget
+  //
+  // See src/utils/apiClient.ts for implementation
+  
   // Mock data - ในอนาคตจะเชื่อมกับ API
   const [mockCurrentBudgets, setMockCurrentBudgets] = useState<Budget[]>([
     {

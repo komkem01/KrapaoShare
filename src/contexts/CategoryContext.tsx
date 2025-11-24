@@ -21,75 +21,39 @@ interface CategoryState {
   expense: Category[];
 }
 
-interface TypeRecord {
-  id: string;
-  name: string;
-}
-
-interface TypeListResponse {
-  items: TypeRecord[];
-}
-
-interface TypeMetadata {
-  loaded: boolean;
-  byId: Record<string, string>;
-  groupByTypeId: Record<string, CategoryGroup | null>;
-  typeIdByGroup: Partial<Record<CategoryGroup, string>>;
-}
-
-const defaultTypeMetadata: TypeMetadata = {
-  loaded: false,
-  byId: {},
-  groupByTypeId: {},
-  typeIdByGroup: {},
-};
-
-// Keywords for detecting category groups
-const incomeKeywords = ['รายรับ', 'income', 'revenue', 'เงินเดือน', 'salary', 'เงินได้'];
-const expenseKeywords = ['รายจ่าย', 'expense', 'cost', 'ค่าใช้จ่าย', 'spending'];
-
 export interface Category {
   id: string;
   name: string;
   icon: string;
   color: string;
-  type_id: string; // ประเภทที่ผู้ใช้สร้าง (required)
-  type_name?: string; // ชื่อประเภท (สำหรับแสดงผล)
+  type: 'income' | 'expense'; // ประเภทหมวดหมู่ (รายรับ/รายจ่าย) จาก Backend
   user_id?: string;
   description?: string;
   is_active?: boolean;
   sort_order?: number;
 }
 
-// Categories grouped by type ID
-interface CategoriesByType {
-  [typeId: string]: Category[];
-}
-
 interface CategoryContextType {
-  categories: CategoryState; // หมวดหมู่แบบเก่า สำหรับ backward compatibility
-  categoriesByType: CategoriesByType; // หมวดหมู่จัดกลุ่มตาม Type ID
+  categories: CategoryState; // หมวดหมู่แยกตาม income/expense
   allCategories: Category[]; // หมวดหมู่ทั้งหมด
   isLoading: boolean;
   error: string | null;
   refreshCategories: () => Promise<void>;
-  addCategory: (type: CategoryGroup, category: Omit<Category, 'id' | 'type_id'>) => Promise<void>;
+  addCategory: (type: CategoryGroup, category: Omit<Category, 'id' | 'type'>) => Promise<void>;
   updateCategory: (type: CategoryGroup, categoryId: string, updates: Partial<Category>) => Promise<void>;
   deleteCategory: (type: CategoryGroup, categoryId: string) => Promise<void>;
   getCategoryById: (categoryId: string) => Category | undefined;
-  getCategoriesByTypeId: (typeId: string) => Category[];
 }
 
 interface ApiCategory {
   id: string;
-  typeId: string;
-  userId?: string;
+  user_id?: string;
   icon?: string;
   color?: string;
   name: string;
+  type: 'income' | 'expense'; // Backend ส่งมาเป็น income หรือ expense
   description?: string;
-  isActive: boolean;
-  sortOrder: number;
+  is_active: boolean;
 }
 
 interface CategoryListResponse {
@@ -105,33 +69,15 @@ const generateCategoryId = () => {
   return `${Date.now()}-${Math.random()}`;
 };
 
-const detectGroupFromName = (name?: string): CategoryGroup | null => {
-  if (!name) return null;
-  const lower = name.toLowerCase();
-  if (incomeKeywords.some((keyword) => lower.includes(keyword))) {
-    return 'income';
-  }
-  if (expenseKeywords.some((keyword) => lower.includes(keyword))) {
-    return 'expense';
-  }
-  return null;
-};
-
-const ensureArray = <T,>(payload: T | { items?: T[] } | undefined): T[] => {
-  if (!payload) return [];
-  if (Array.isArray(payload)) return payload;
-  if (Array.isArray((payload as { items?: T[] }).items)) {
-    return (payload as { items?: T[] }).items ?? [];
-  }
-  return [];
-};
-
-const mapApiCategoryToLocal = (item: ApiCategory, group: CategoryGroup): Category => ({
+const mapApiCategoryToLocal = (item: ApiCategory): Category => ({
   id: item.id,
   name: item.name,
-  icon: item.icon ?? (group === 'income' ? '💰' : '💳'),
-  color: item.color ?? (group === 'income' ? '#22c55e' : '#ef4444'),
-  type_id: item.typeId, // Map typeId to type_id
+  type: item.type, // income หรือ expense จาก Backend
+  icon: item.icon ?? (item.type === 'income' ? '💰' : '💳'),
+  color: item.color ?? (item.type === 'income' ? '#22c55e' : '#ef4444'),
+  user_id: item.user_id,
+  description: item.description,
+  is_active: item.is_active,
 });
 
 export function CategoryProvider({ children }: { children: ReactNode }) {
@@ -143,7 +89,6 @@ export function CategoryProvider({ children }: { children: ReactNode }) {
   const [error, setError] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
   const [categoryMeta, setCategoryMeta] = useState<Record<string, ApiCategory>>({});
-  const [typeMetadata, setTypeMetadata] = useState<TypeMetadata>(defaultTypeMetadata);
   const categoriesLoadedRef = useRef(false);
 
   useEffect(() => {
@@ -152,90 +97,6 @@ export function CategoryProvider({ children }: { children: ReactNode }) {
       setUserId(storedUser.id as string);
     }
   }, []);
-
-  const resolveGroupForType = (typeId: string, meta: TypeMetadata): CategoryGroup | null => {
-    if (meta.groupByTypeId[typeId]) {
-      return meta.groupByTypeId[typeId] ?? null;
-    }
-
-    const name = meta.byId[typeId];
-    const detected = detectGroupFromName(name);
-    if (detected) {
-      setTypeMetadata((prev) => ({
-        ...prev,
-        groupByTypeId: { ...prev.groupByTypeId, [typeId]: detected },
-        typeIdByGroup: {
-          ...prev.typeIdByGroup,
-          [detected]: prev.typeIdByGroup[detected] ?? typeId,
-        },
-      }));
-    }
-    return detected;
-  };
-
-  const ensureTypeMetadata = useCallback(async (): Promise<TypeMetadata> => {
-    const activeUserId = userId ?? (getStoredUser()?.id as string | undefined) ?? null;
-    
-    if (!activeUserId) {
-      console.warn('No user ID available for fetching types');
-      const next = { ...typeMetadata, loaded: true };
-      setTypeMetadata(next);
-      return next;
-    }
-
-    setTypeMetadata((current) => {
-      if (current.loaded && Object.keys(current.byId).length) {
-        return current;
-      }
-      return current;
-    });
-
-    // Get current state for reference
-    const currentMeta = typeMetadata;
-    if (currentMeta.loaded && Object.keys(currentMeta.byId).length) {
-      return currentMeta;
-    }
-
-    try {
-      // ใช้เส้น /types/user/:userId เพื่อดึงข้อมูลเฉพาะของผู้ใช้งานคนนั้น
-      const response = await apiClient.get<TypeRecord[] | TypeListResponse>(`/types/user/${activeUserId}`);
-      
-      // Handle both array response and object with items
-      let items: TypeRecord[] = [];
-      if (Array.isArray(response)) {
-        items = response;
-      } else if (response && 'items' in response && Array.isArray(response.items)) {
-        items = response.items;
-      }
-      
-      const byId: Record<string, string> = {};
-      const groupByTypeId: Record<string, CategoryGroup | null> = {};
-      const typeIdByGroup: Partial<Record<CategoryGroup, string>> = {};
-
-      items.forEach((item) => {
-        byId[item.id] = item.name;
-        const detected = detectGroupFromName(item.name);
-        groupByTypeId[item.id] = detected;
-        if (detected && !typeIdByGroup[detected]) {
-          typeIdByGroup[detected] = item.id;
-        }
-      });
-
-      const next: TypeMetadata = {
-        loaded: true,
-        byId: { ...currentMeta.byId, ...byId },
-        groupByTypeId: { ...currentMeta.groupByTypeId, ...groupByTypeId },
-        typeIdByGroup: { ...currentMeta.typeIdByGroup, ...typeIdByGroup },
-      };
-      setTypeMetadata(next);
-      return next;
-    } catch (err) {
-      console.warn('Failed to load category types', err);
-      const next = { ...currentMeta, loaded: true };
-      setTypeMetadata(next);
-      return next;
-    }
-  }, [userId]);
 
   const refreshCategories = useCallback(async () => {
     const activeUserId = userId ?? (getStoredUser()?.id as string | undefined) ?? null;
@@ -251,10 +112,12 @@ export function CategoryProvider({ children }: { children: ReactNode }) {
     setError(null);
 
     try {
-      const typeMeta = await ensureTypeMetadata();
+      
+      console.log('[CategoryContext] Loading categories for user:', activeUserId);
       
       // ใช้เส้น /categories/user/:userId เพื่อดึงข้อมูลเฉพาะของผู้ใช้งานคนนั้น
       const response = await apiClient.get<CategoryListResponse | ApiCategory[]>(`/categories/user/${activeUserId}`);
+      console.log('[CategoryContext] Raw API response:', response);
       
       // Handle both array response and object with items
       let remoteCategories: ApiCategory[] = [];
@@ -263,9 +126,11 @@ export function CategoryProvider({ children }: { children: ReactNode }) {
       } else if (response && 'items' in response && Array.isArray(response.items)) {
         remoteCategories = response.items;
       }
+      
+      console.log('[CategoryContext] Parsed categories:', remoteCategories);
 
       if (remoteCategories.length === 0) {
-        console.warn('No categories found for user, setting empty state');
+        console.warn('[CategoryContext] No categories found for user, setting empty state');
         setCategories({ income: [], expense: [] });
         setCategoryMeta({});
         categoriesLoadedRef.current = true;
@@ -276,19 +141,20 @@ export function CategoryProvider({ children }: { children: ReactNode }) {
       const metaMap: Record<string, ApiCategory> = {};
 
       remoteCategories.forEach((item) => {
-        const group =
-          resolveGroupForType(item.typeId, typeMeta) ||
-          (Object.entries(typeMeta.typeIdByGroup).find(([, id]) => id === item.typeId)?.[0] as CategoryGroup | undefined) ||
-          detectGroupFromName(item.name);
+        // ใช้ field type จาก Backend โดยตรง
+        const group = item.type; // 'income' หรือ 'expense'
+        console.log('[CategoryContext] Processing category:', item.name, 'type:', item.type);
 
-        if (!group) {
-          console.warn(`Could not determine group for category: ${item.name}`);
+        if (!group || (group !== 'income' && group !== 'expense')) {
+          console.warn(`[CategoryContext] Invalid category type for: ${item.name}, type: ${item.type}`);
           return;
         }
 
-        grouped[group].push(mapApiCategoryToLocal(item, group));
+        grouped[group].push(mapApiCategoryToLocal(item));
         metaMap[item.id] = item;
       });
+      
+      console.log('[CategoryContext] Final grouped categories:', grouped);
 
       setCategories(grouped);
       setCategoryMeta(metaMap);
@@ -303,50 +169,26 @@ export function CategoryProvider({ children }: { children: ReactNode }) {
     } finally {
       setIsLoading(false);
     }
-  }, [userId, ensureTypeMetadata]);  useEffect(() => {
+  }, [userId]);
+
+  useEffect(() => {
     refreshCategories().catch((err) => {
       console.warn('Initial category fetch failed', err);
     });
-  }, [userId]);
-
-  const resolveTypeIdForGroup = useCallback(
-    async (group: CategoryGroup): Promise<string | null> => {
-      const meta = await ensureTypeMetadata();
-      if (meta.typeIdByGroup[group]) {
-        return meta.typeIdByGroup[group] ?? null;
-      }
-
-      const candidate = Object.entries(meta.groupByTypeId).find(([, value]) => value === group)?.[0];
-      if (candidate) {
-        setTypeMetadata((prev) => ({
-          ...prev,
-          typeIdByGroup: { ...prev.typeIdByGroup, [group]: candidate },
-        }));
-        return candidate;
-      }
-      return null;
-    },
-    [ensureTypeMetadata]
-  );
+  }, [userId, refreshCategories]);
 
   const addCategory = useCallback<
     CategoryContextType['addCategory']
   >(
     async (type, category) => {
       const tempId = generateCategoryId();
-      
-      // Get type_id for this category group
-      const typeId = await resolveTypeIdForGroup(type);
-      if (!typeId) {
-        throw new Error(`ไม่พบประเภทสำหรับหมวดหมู่ ${type}`);
-      }
 
       const optimistic: Category = {
         id: tempId,
         name: category.name,
         icon: category.icon,
         color: category.color,
-        type_id: typeId,
+        type: type, // income หรือ expense
       };
 
       setCategories((prev) => ({
@@ -359,20 +201,13 @@ export function CategoryProvider({ children }: { children: ReactNode }) {
       }
 
       try {
-        const typeId = await resolveTypeIdForGroup(type);
-        if (!typeId) {
-          throw new Error(`ไม่พบประเภทสำหรับหมวดหมู่ ${type}`);
-        }
-
         const payload = {
-          typeId,
-          userId,
+          user_id: userId,
+          type: type, // ส่ง income หรือ expense
           icon: category.icon,
           color: category.color,
           name: category.name.trim(),
-          description: undefined,
-          isActive: true,
-          sortOrder: 999, // Use high number instead of depending on current length
+          is_active: true,
         };
 
         const created = await apiClient.post<ApiCategory>('/categories', payload);
@@ -381,7 +216,7 @@ export function CategoryProvider({ children }: { children: ReactNode }) {
           ...prev,
           [type]: prev[type].map((cat) =>
             cat.id === tempId
-              ? mapApiCategoryToLocal(created, type)
+              ? mapApiCategoryToLocal(created)
               : cat
           ),
         }));
@@ -394,7 +229,7 @@ export function CategoryProvider({ children }: { children: ReactNode }) {
         setError((err as Error).message ?? 'ไม่สามารถสร้างหมวดหมู่ได้');
       }
     },
-    [resolveTypeIdForGroup, userId]
+    [userId]
   );
 
   const updateCategory = useCallback<
@@ -425,9 +260,8 @@ export function CategoryProvider({ children }: { children: ReactNode }) {
           name: (updates.name ?? currentCategory.name).trim(),
           icon: updates.icon ?? existingMeta?.icon,
           color: updates.color ?? existingMeta?.color,
-          description: existingMeta?.description,
-          isActive: existingMeta?.isActive ?? true,
-          sortOrder: existingMeta?.sortOrder ?? 0,
+          type: updates.type ?? existingMeta?.type ?? currentCategory.type,
+          is_active: existingMeta?.is_active ?? true,
         };
 
         const updated = await apiClient.patch<ApiCategory>(`/categories/${categoryId}`, payload);
@@ -490,27 +324,11 @@ export function CategoryProvider({ children }: { children: ReactNode }) {
     [categories]
   );
 
-  const getCategoriesByTypeId = useCallback<CategoryContextType['getCategoriesByTypeId']>(
-    (typeId) => {
-      return [...categories.income, ...categories.expense].filter(cat => cat.type_id === typeId);
-    },
-    [categories]
-  );
-
-  // Create categoriesByType and allCategories for new API
-  const categoriesByType: CategoriesByType = {};
+  // Create allCategories for easy access
   const allCategories = [...categories.income, ...categories.expense];
-  
-  allCategories.forEach(category => {
-    if (!categoriesByType[category.type_id]) {
-      categoriesByType[category.type_id] = [];
-    }
-    categoriesByType[category.type_id].push(category);
-  });
 
   const value: CategoryContextType = {
     categories,
-    categoriesByType,
     allCategories,
     isLoading,
     error,
@@ -519,7 +337,6 @@ export function CategoryProvider({ children }: { children: ReactNode }) {
     updateCategory,
     deleteCategory,
     getCategoryById,
-    getCategoriesByTypeId,
   };
 
   return (

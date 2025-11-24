@@ -1,27 +1,47 @@
-// User types
+// User types - สอดคล้องกับ API Response
 export interface User {
-  user_id: string;
-  firstname: string;
+  id: string;
   email: string;
+  firstname: string;
+  lastname: string;
+  phone?: string;
+  birth_date?: string;
+  occupation?: string;
+  address?: string;
+  role: 'member' | 'admin' | 'owner';
+  status: 'active' | 'inactive' | 'suspended';
   avatar_url?: string;
+  timezone: string;
   created_at: string;
   updated_at: string;
 }
 
-// Transaction types
-export type TransactionType = 'expense' | 'income';
+// Transaction types - สอดคล้องกับ API Response
+export type TransactionType = 'income' | 'expense' | 'transfer';
 
 export interface Transaction {
-  transaction_id: string;
-  user_id: string;
+  id: string;
+  userId: string;
+  accountId: string;
+  categoryId?: string;
   type: TransactionType;
   amount: number;
-  category: string;
   description: string;
-  date: string;
-  bill_split_id?: string; // เชื่อมโยงกับ BillSplit ถ้ามี
-  shared_goal_id?: string; // เชื่อมโยงกับ SharedGoal ถ้ามี
-  created_at: string;
+  transactionDate: string;
+  transactionTime?: string;
+  referenceNumber?: string;
+  location?: string;
+  notes?: string;
+  tags: string[];
+  receiptUrl?: string;
+  isRecurring: boolean;
+  recurringBillId?: string;
+  transferToAccountId?: string;
+  billId?: string;
+  sharedGoalId?: string;
+  budgetId?: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 // Bill Splitting types
@@ -161,13 +181,63 @@ export interface ApiResponse<T> {
   message?: string;
 }
 
-// Form types
+// Form types - ปรับให้สอดคล้องกับ API
 export interface AddTransactionForm {
+  userId: string;
+  accountId: string;
+  categoryId?: string;
   type: TransactionType;
   amount: number;
-  category: string;
   description: string;
-  date: string;
+  transactionDate: string;
+  transactionTime?: string;
+  referenceNumber?: string;
+  location?: string;
+  notes?: string;
+  tags?: string[];
+  receiptUrl?: string;
+  isRecurring?: boolean;
+  recurringBillId?: string;
+  transferToAccountId?: string;
+  billId?: string;
+  sharedGoalId?: string;
+  budgetId?: string;
+}
+
+// Account Form types
+export interface CreateAccountForm {
+  user_id: string;
+  name: string;
+  bank_name?: string;
+  bank_number?: string;
+  account_type?: 'personal' | 'shared' | 'business';
+  color?: string;
+  start_amount?: number;
+  is_private?: boolean;
+  is_active?: boolean;
+}
+
+// Category Form types
+export interface CreateCategoryForm {
+  user_id: string;
+  name: string;
+  icon?: string;
+  color?: string;
+  type: 'income' | 'expense';
+  is_active?: boolean;
+}
+
+// Notification Form types
+export interface CreateNotificationForm {
+  user_id: string;
+  title: string;
+  message: string;
+  type: 'info' | 'warning' | 'error' | 'success';
+  priority?: 'low' | 'normal' | 'high' | 'urgent';
+  icon?: string;
+  data?: Record<string, unknown>;
+  action_url?: string;
+  expires_at?: string;
 }
 
 export interface CreateBillSplitForm {
@@ -198,6 +268,89 @@ export interface CreateSharedGoalForm {
   target_amount: number;
   target_date: string;
   member_user_ids: string[];
+}
+
+// Account types - เพิ่มเติมจาก API
+export interface Account {
+  id: string;
+  user_id: string;
+  name: string;
+  bank_name?: string;
+  bank_number?: string;
+  account_type: 'personal' | 'shared' | 'business';
+  color?: string;
+  start_amount: number;
+  current_balance: number;
+  is_private: boolean;
+  is_active: boolean;
+  share_code?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+// Account Member types
+export interface AccountMember {
+  id: string;
+  account_id: string;
+  user_id: string;
+  role: 'owner' | 'admin' | 'member' | 'viewer';
+  permissions: {
+    read: boolean;
+    write: boolean;
+    delete: boolean;
+  };
+  joined_at: string;
+  invited_by?: string;
+  created_at: string;
+  updated_at: string;
+  user_name?: string;
+  user_email?: string;
+  account_name?: string;
+}
+
+// Account Transfer types
+export interface AccountTransfer {
+  id: string;
+  from_account_id: string;
+  to_account_id: string;
+  amount: number;
+  description?: string;
+  transfer_fee: number;
+  exchange_rate: number;
+  status: 'pending' | 'completed' | 'failed' | 'cancelled';
+  created_at: string;
+  updated_at: string;
+}
+
+// Category types - สอดคล้องกับ API
+export interface Category {
+  id: string;
+  user_id: string;
+  name: string;
+  icon?: string;
+  color?: string;
+  type: 'income' | 'expense';
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+// Notification types - สอดคล้องกับ API
+export interface Notification {
+  id: string;
+  user_id: string;
+  title: string;
+  message: string;
+  type: 'info' | 'warning' | 'error' | 'success';
+  priority: 'low' | 'normal' | 'high' | 'urgent';
+  icon?: string;
+  data?: Record<string, unknown>;
+  is_read: boolean;
+  read_at?: string;
+  action_url?: string;
+  expires_at?: string;
+  created_at: string;
+  updated_at: string;
 }
 
 // Types management

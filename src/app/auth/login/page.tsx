@@ -8,6 +8,8 @@ import GoogleButton from "@/components/auth/GoogleButton";
 import InputField from "@/components/auth/InputField";
 import PrimaryButton from "@/components/auth/PrimaryButton";
 import { saveAuthData } from "@/utils/authStorage";
+import { authApi } from "@/utils/apiClient";
+import { useUser } from "@/contexts/UserContext";
 
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/api/v1";
@@ -15,6 +17,7 @@ const API_BASE_URL =
 function LoginContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { refreshUser } = useUser();
   const [formData, setFormData] = useState({
     email: "",
     password: "",
@@ -46,12 +49,7 @@ function LoginContent() {
   const handleGoogleLogin = async () => {
     setLoading(true);
     try {
-      const response = await fetch(`${API_BASE_URL}/auth/google/login`);
-      if (!response.ok) {
-        throw new Error("ไม่สามารถเชื่อมต่อ Google OAuth ได้");
-      }
-
-      const data = await response.json().catch(() => null);
+      const data = await authApi.getGoogleLoginUrl() as any;
 
       if (data?.url) {
         window.location.href = data.url;
@@ -97,23 +95,9 @@ function LoginContent() {
         password: formData.password,
       };
 
-      const response = await fetch(`${API_BASE_URL}/auth/login`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(payload),
-      });
+      const authData = await authApi.login(payload) as any;
 
-      const result = await response.json().catch(() => null);
-      if (!response.ok) {
-        const errorMessage =
-          result?.message || result?.error || "เกิดข้อผิดพลาดในการเข้าสู่ระบบ";
-        setErrors({ general: errorMessage });
-        return;
-      }
-
-      const authData = result?.data;
+      // API client already unwraps the response, so authData is the actual data
       if (!authData?.accessToken || !authData?.refreshToken || !authData?.user) {
         setErrors({
           general: "ข้อมูลการเข้าสู่ระบบไม่ครบถ้วน กรุณาลองใหม่อีกครั้ง",
@@ -128,8 +112,12 @@ function LoginContent() {
         user: authData.user,
       });
 
-      setSuccessMessage(result?.message || "เข้าสู่ระบบสำเร็จ");
+      setSuccessMessage("เข้าสู่ระบบสำเร็จ");
       setFormData({ email: "", password: "" });
+      
+      // Refresh user data from /me endpoint
+      await refreshUser();
+      
       setTimeout(() => {
         router.push("/dashboard");
       }, 400);
@@ -172,6 +160,7 @@ function LoginContent() {
           return;
         }
 
+        // For Google callback, data is in result.data
         const authData = result?.data;
         if (
           !authData?.accessToken ||
@@ -190,6 +179,9 @@ function LoginContent() {
           expiresAt: authData.expiresAt,
           user: authData.user,
         });
+
+        // Refresh user data from /me endpoint
+        await refreshUser();
 
         if (!isCancelled) {
           router.replace("/dashboard");

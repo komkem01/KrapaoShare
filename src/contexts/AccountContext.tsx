@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react';
 import { apiClient } from '@/utils/apiClient';
+import { normalizeListResponse, PaginatedPayload } from '@/utils/apiResponse';
 import { getStoredUser } from '@/utils/authStorage';
 
 // API Response Types based on Go backend
@@ -33,7 +34,53 @@ export interface AccountMember {
   can_withdraw: boolean;
   joined_at: string;
   invited_by: string | null;
+  user_name?: string | null;
+  user_email?: string | null;
+  account_name?: string | null;
 }
+
+type PermissionsResponse =
+  | string[]
+  | {
+      view?: boolean;
+      deposit?: boolean;
+      withdraw?: boolean;
+    }
+  | null
+  | undefined;
+
+type AccountMemberResponse = Omit<AccountMember, 'permissions'> & {
+  permissions: PermissionsResponse;
+};
+
+const buildPermissionsPayload = (permissions: string[]) => ({
+  view: true,
+  deposit: permissions.includes('deposit'),
+  withdraw: permissions.includes('withdraw'),
+});
+
+const normalizePermissions = (permissions: PermissionsResponse): string[] => {
+  if (Array.isArray(permissions)) {
+    return permissions;
+  }
+
+  const normalized: string[] = [];
+
+  if (permissions?.deposit) {
+    normalized.push('deposit');
+  }
+
+  if (permissions?.withdraw) {
+    normalized.push('withdraw');
+  }
+
+  return normalized;
+};
+
+const mapMemberPermissions = (member: AccountMemberResponse): AccountMember => ({
+  ...member,
+  permissions: normalizePermissions(member.permissions),
+});
 
 export interface AccountTransfer {
   id: string;
@@ -44,6 +91,8 @@ export interface AccountTransfer {
   transferred_by: string;
   created_at: string;
 }
+
+type AccountTransferListPayload = AccountTransfer[] | PaginatedPayload<AccountTransfer> | undefined;
 
 export interface CreateAccountRequest {
   user_id: string;
@@ -102,7 +151,7 @@ interface AccountContextType {
   
   // Member operations
   getAccountMembers: (accountId: string) => Promise<AccountMember[]>;
-  addMember: (accountId: string, userId: string, role: 'admin' | 'member', permissions: string[]) => Promise<AccountMember>;
+  addMember: (accountId: string, userEmail: string, role: 'admin' | 'member', permissions: string[]) => Promise<AccountMember>;
   updateMember: (memberId: string, permissions: string[]) => Promise<AccountMember>;
   removeMember: (memberId: string) => Promise<void>;
   
@@ -157,10 +206,14 @@ export const AccountProvider: React.FC<AccountProviderProps> = ({ children }) =>
       for (const account of accountsData) {
         if (account.account_type === 'shared') {
           try {
-            const accountMembers = await apiClient.get<AccountMember[]>(`/account-members/account/${account.id}`);
+            const accountMembers = await apiClient.get<AccountMemberResponse[]>(`/account-members/account/${account.id}`);
+            const normalizedMembers = Array.isArray(accountMembers)
+              ? accountMembers.map(mapMemberPermissions)
+              : [];
+
             setMembers(prev => ({
               ...prev,
-              [account.id]: Array.isArray(accountMembers) ? accountMembers : []
+              [account.id]: normalizedMembers
             }));
           } catch (err) {
             console.error(`Failed to fetch members for account ${account.id}:`, err);
@@ -284,8 +337,10 @@ export const AccountProvider: React.FC<AccountProviderProps> = ({ children }) =>
 
   const getAccountMembers = useCallback(async (accountId: string): Promise<AccountMember[]> => {
     try {
-      const accountMembers = await apiClient.get<AccountMember[]>(`/account-members/account/${accountId}`);
-      const membersList = Array.isArray(accountMembers) ? accountMembers : [];
+      const accountMembers = await apiClient.get<AccountMemberResponse[]>(`/account-members/account/${accountId}`);
+      const membersList = Array.isArray(accountMembers)
+        ? accountMembers.map(mapMemberPermissions)
+        : [];
       
       setMembers(prev => ({
         ...prev,
@@ -302,28 +357,27 @@ export const AccountProvider: React.FC<AccountProviderProps> = ({ children }) =>
 
   const addMember = useCallback(async (
     accountId: string,
-    userId: string,
+    userEmail: string,
     role: 'admin' | 'member',
     permissions: string[]
   ): Promise<AccountMember> => {
     try {
       const payload = {
         account_id: accountId,
-        user_id: userId,
+        user_email: userEmail,
         role,
-        permissions,
-        can_deposit: permissions.includes('deposit'),
-        can_withdraw: permissions.includes('withdraw'),
+        permissions: buildPermissionsPayload(permissions),
       };
 
-      const member = await apiClient.post<AccountMember>('/account-members', payload);
+      const member = await apiClient.post<AccountMemberResponse>('/account-members', payload);
+      const normalizedMember = mapMemberPermissions(member);
       
       setMembers(prev => ({
         ...prev,
-        [accountId]: [...(prev[accountId] || []), member]
+        [accountId]: [...(prev[accountId] || []), normalizedMember]
       }));
 
-      return member;
+      return normalizedMember;
     } catch (err) {
       console.error('Failed to add member:', err);
       throw new Error('ไม่สามารถเพิ่มสมาชิกได้');
@@ -336,25 +390,24 @@ export const AccountProvider: React.FC<AccountProviderProps> = ({ children }) =>
   ): Promise<AccountMember> => {
     try {
       const payload = {
-        permissions,
-        can_deposit: permissions.includes('deposit'),
-        can_withdraw: permissions.includes('withdraw'),
+        permissions: buildPermissionsPayload(permissions),
       };
 
-      const member = await apiClient.patch<AccountMember>(`/account-members/${memberId}`, payload);
+      const member = await apiClient.patch<AccountMemberResponse>(`/account-members/${memberId}`, payload);
+      const normalizedMember = mapMemberPermissions(member);
       
       // Update members in state
       setMembers(prev => {
         const updated = { ...prev };
         Object.keys(updated).forEach(accountId => {
           updated[accountId] = updated[accountId].map(m => 
-            m.id === memberId ? member : m
+            m.id === memberId ? normalizedMember : m
           );
         });
         return updated;
       });
 
-      return member;
+      return normalizedMember;
     } catch (err) {
       console.error(`Failed to update member ${memberId}:`, err);
       throw new Error('ไม่สามารถอัปเดตสมาชิกได้');
@@ -399,8 +452,8 @@ export const AccountProvider: React.FC<AccountProviderProps> = ({ children }) =>
         ? `/account-transfers?account_id=${accountId}`
         : '/account-transfers';
       
-      const transfers = await apiClient.get<AccountTransfer[]>(endpoint);
-      return Array.isArray(transfers) ? transfers : [];
+      const payload = await apiClient.get<AccountTransferListPayload>(endpoint);
+      return normalizeListResponse<AccountTransfer>(payload).items;
     } catch (err) {
       console.error('Failed to fetch transfers:', err);
       setError('ไม่สามารถโหลดประวัติการโอนได้');

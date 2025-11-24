@@ -48,6 +48,20 @@ export default function GoalsPage() {
 
   const [goals, setGoals] = useState<Goal[]>([]);
 
+  // TODO: ✅ Backend API Ready!
+  // Backend now has /goals and /goal-contributions endpoints - integrate with real API:
+  //   GET    /goals                          - List goals
+  //   POST   /goals                          - Create goal
+  //   GET    /goals/:id                      - Get goal details
+  //   PATCH  /goals/:id                      - Update goal
+  //   DELETE /goals/:id                      - Delete goal
+  //   GET    /goal-contributions             - List contributions
+  //   POST   /goal-contributions             - Add contribution
+  //   GET    /goal-contributions/goal/:goalId - Get goal contributions
+  //   GET    /goal-contributions/user/:userId - Get user's contributions
+  //
+  // See src/utils/apiClient.ts for implementation
+
   // Mock accounts data
   const mockAccounts: Account[] = [
     {

@@ -89,7 +89,7 @@ export default function AccountsPage() {
 
   const inviteDefaults = {
     accountId: '',
-    email: '',
+    userEmail: '',
     role: 'member' as 'admin' | 'member',
     permissions: [] as string[]
   };
@@ -137,14 +137,19 @@ export default function AccountsPage() {
       .filter((account): account is ApiAccount => Boolean(account && account.id))
       .map((account, index) => {
         const memberList = (apiMembers?.[account.id] || []).filter(Boolean);
-        const formattedMembers: UIMember[] = memberList.map(member => ({
-          id: member.id,
-          name: member.user_id,
-          email: member.user_id,
-          joinDate: member.joined_at,
-          permissions: member.permissions,
-          role: member.role,
-        }));
+        const formattedMembers: UIMember[] = memberList.map(member => {
+          const displayName = member.user_name || member.user_email || member.user_id || 'สมาชิกใหม่';
+          const displayEmail = member.user_email || (member.user_id.includes('@') ? member.user_id : undefined);
+
+          return {
+            id: member.id,
+            name: displayName,
+            email: displayEmail,
+            joinDate: member.joined_at,
+            permissions: member.permissions,
+            role: member.role,
+          };
+        });
 
         return {
           ...account,
@@ -363,7 +368,7 @@ export default function AccountsPage() {
   };
 
   const handleInviteMember = async () => {
-    if (!inviteData.accountId || !inviteData.email) {
+    if (!inviteData.accountId || !inviteData.userEmail) {
       alert('กรุณาเลือกบัญชีและกรอกข้อมูลผู้ใช้');
       return;
     }
@@ -372,11 +377,12 @@ export default function AccountsPage() {
     try {
       await addMember(
         inviteData.accountId,
-        inviteData.email.trim(),
+        inviteData.userEmail.trim(),
         inviteData.role,
         inviteData.permissions
       );
       await getAccountMembers(inviteData.accountId);
+      await refreshAccounts(); // Refresh accounts to show updated shared accounts
       setInviteData(inviteDefaults);
       setShowInviteModal(false);
       showSuccess('เชิญสมาชิกสำเร็จ! ✉️');
@@ -385,9 +391,7 @@ export default function AccountsPage() {
     } finally {
       setIsSubmitting(false);
     }
-  };
-
-  const handleEditAccount = (account: UIAccount) => {
+  };  const handleEditAccount = (account: UIAccount) => {
     setEditingAccount(account);
     setShowEditModal(true);
   };
@@ -1958,14 +1962,14 @@ export default function AccountsPage() {
                   <div className="space-y-4">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        ID ผู้ใช้หรืออีเมลของสมาชิกใหม่
+                        อีเมลของสมาชิกใหม่
                       </label>
                       <input
                         type="email"
-                        value={inviteData.email}
-                        onChange={(e) => setInviteData({...inviteData, email: e.target.value})}
+                        value={inviteData.userEmail}
+                        onChange={(e) => setInviteData({...inviteData, userEmail: e.target.value})}
                         className="w-full px-4 py-3 border border-gray-200 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-all duration-200 dark:bg-gray-700 dark:text-white"
-                        placeholder="เช่น USER_123 หรือ email"
+                        placeholder="เช่น name@email.com"
                       />
                     </div>
 
@@ -2031,7 +2035,7 @@ export default function AccountsPage() {
                     </button>
                     <button
                       onClick={handleInviteMember}
-                      disabled={isSubmitting || !inviteData.accountId || !inviteData.email}
+                      disabled={isSubmitting || !inviteData.accountId || !inviteData.userEmail}
                       className="flex-1 px-6 py-3 bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 disabled:from-gray-400 disabled:to-gray-500 text-white rounded-xl transition-all duration-200 font-medium disabled:cursor-not-allowed"
                     >
                       {isSubmitting ? 'กำลังส่งคำเชิญ...' : 'ส่งคำเชิญ'}
