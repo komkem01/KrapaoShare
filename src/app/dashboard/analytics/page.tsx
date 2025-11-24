@@ -1,9 +1,18 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import DashboardLayout from '@/components/layout/DashboardLayout';
+import { useTransactions } from '@/contexts/TransactionContext';
+import { useAccounts } from '@/contexts/AccountContext';
+import { useCategories } from '@/contexts/CategoryContext';
+import type { Transaction } from '@/types/transaction';
+import { toast } from 'sonner';
 
 export default function AnalyticsPage() {
+  const { transactions, isLoading: transactionsLoading, refreshTransactions } = useTransactions();
+  const { accounts, refreshAccounts } = useAccounts();
+  const { categories: userCategories } = useCategories();
+  
   const [selectedPeriod, setSelectedPeriod] = useState<'week' | 'month' | 'year'>('month');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [showExportModal, setShowExportModal] = useState(false);
@@ -18,7 +27,95 @@ export default function AnalyticsPage() {
     deadline: ''
   });
 
-  // Mock data - ในอนาคตจะเชื่อมกับ API
+  // Load data on mount
+  useEffect(() => {
+    const loadData = async () => {
+      await Promise.all([
+        refreshTransactions(),
+        refreshAccounts()
+      ]);
+    };
+    loadData();
+  }, [refreshTransactions, refreshAccounts]);
+
+  // Analyze real transaction data
+  const analyticsData = useMemo(() => {
+    if (!transactions.length) return null;
+
+    // Calculate monthly summary
+    const monthlyGroups: Record<string, { income: number; expense: number; transfer: number }> = {};
+    
+    transactions.forEach(transaction => {
+      const date = new Date(transaction.transactionDate);
+      const monthKey = date.toLocaleDateString('th-TH', { year: '2-digit', month: 'short' });
+      
+      if (!monthlyGroups[monthKey]) {
+        monthlyGroups[monthKey] = { income: 0, expense: 0, transfer: 0 };
+      }
+      
+      monthlyGroups[monthKey][transaction.type] += transaction.amount;
+    });
+
+    const monthlyData = Object.entries(monthlyGroups)
+      .map(([month, data]) => ({
+        month,
+        income: data.income,
+        expense: data.expense,
+        savings: data.income - data.expense
+      }))
+      .sort((a, b) => new Date(a.month).getTime() - new Date(b.month).getTime())
+      .slice(-6); // Last 6 months
+
+    // Category analysis for expenses only
+    const categoryGroups: Record<string, number> = {};
+    const allCategories = [...(userCategories.income || []), ...(userCategories.expense || [])];
+    
+    transactions
+      .filter(t => t.type === 'expense')
+      .forEach(transaction => {
+        const category = allCategories.find(cat => cat.id === transaction.categoryId);
+        const categoryName = category?.name || 'ไม่ระบุหมวดหมู่';
+        categoryGroups[categoryName] = (categoryGroups[categoryName] || 0) + transaction.amount;
+      });
+
+    const totalExpense = Object.values(categoryGroups).reduce((sum, amount) => sum + amount, 0);
+    
+    const colors = ['bg-red-500', 'bg-blue-500', 'bg-green-500', 'bg-yellow-500', 'bg-purple-500', 'bg-gray-500'];
+    
+    const categoryData = Object.entries(categoryGroups)
+      .map(([category, amount], index) => ({
+        category,
+        amount,
+        percentage: totalExpense > 0 ? (amount / totalExpense) * 100 : 0,
+        color: colors[index % colors.length]
+      }))
+      .sort((a, b) => b.amount - a.amount)
+      .slice(0, 5); // Top 5 categories
+
+    // Summary statistics
+    const totalIncome = transactions
+      .filter(t => t.type === 'income')
+      .reduce((sum, t) => sum + t.amount, 0);
+    
+    const totalExpenses = transactions
+      .filter(t => t.type === 'expense')
+      .reduce((sum, t) => sum + t.amount, 0);
+
+    const totalBalance = accounts.reduce((sum, account) => sum + account.current_balance, 0);
+
+    return {
+      monthlyData,
+      categoryData,
+      summary: {
+        totalIncome,
+        totalExpenses,
+        totalBalance,
+        netSavings: totalIncome - totalExpenses
+      }
+    };
+  }, [transactions, accounts, userCategories]);
+
+  // Fallback mock data when no real data is available
   const mockMonthlyData = [
     { month: 'ต.ค. 25', income: 25000, expense: 18500, savings: 6500 },
     { month: 'พ.ย. 25', income: 28000, expense: 22000, savings: 6000 },
@@ -53,10 +150,22 @@ export default function AnalyticsPage() {
     { name: 'กองทุนฉุกเฉิน', current: 15000, target: 30000, percentage: 50 }
   ];
 
-  const totalIncome = mockMonthlyData.reduce((sum, month) => sum + month.income, 0);
-  const totalExpense = mockMonthlyData.reduce((sum, month) => sum + month.expense, 0);
-  const totalSavings = mockMonthlyData.reduce((sum, month) => sum + month.savings, 0);
-  const avgMonthlyExpense = totalExpense / mockMonthlyData.length;
+  // Use real data if available, otherwise use mock data
+  const currentData = analyticsData || {
+    monthlyData: mockMonthlyData,
+    categoryData: mockCategoryData,
+    summary: {
+      totalIncome: mockMonthlyData.reduce((sum, month) => sum + month.income, 0),
+      totalExpenses: mockMonthlyData.reduce((sum, month) => sum + month.expense, 0),
+      totalBalance: 25000,
+      netSavings: mockMonthlyData.reduce((sum, month) => sum + month.savings, 0)
+    }
+  };
+
+  const totalIncome = currentData.summary.totalIncome;
+  const totalExpense = currentData.summary.totalExpenses;
+  const totalSavings = currentData.summary.netSavings;
+  const avgMonthlyExpense = currentData.monthlyData.length > 0 ? totalExpense / currentData.monthlyData.length : 0;
   const maxExpense = Math.max(...mockWeeklySpending.map(day => day.amount));
 
   // Functions
@@ -96,17 +205,17 @@ export default function AnalyticsPage() {
 
   const handleViewLastYear = () => {
     // In a real app, this would fetch last year's data
-    alert('ฟีเจอร์นี้จะแสดงข้อมูลปีก่อนหน้า กำลังพัฒนา...');
+    toast.info('ฟีเจอร์นี้จะแสดงข้อมูลปีก่อนหน้า กำลังพัฒนา...');
   };
 
   const handleCreateGoal = async () => {
     if (!newGoal.name || !newGoal.target || !newGoal.deadline) {
-      alert('กรุณากรอกข้อมูลให้ครบถ้วน');
+      toast.info('กรุณากรอกข้อมูลให้ครบถ้วน');
       return;
     }
 
     if (parseFloat(newGoal.target) <= 0) {
-      alert('เป้าหมายต้องมากกว่า 0');
+      toast.info('เป้าหมายต้องมากกว่า 0');
       return;
     }
 
@@ -293,7 +402,7 @@ export default function AnalyticsPage() {
               แนวโน้มรายรับ-จ่าย (6 เดือนย้อนหลัง)
             </h3>
             <div className="space-y-4">
-              {mockMonthlyData.map((month, index) => (
+              {currentData.monthlyData.map((month, index) => (
                 <div key={index} className="space-y-2">
                   <div className="flex justify-between items-center text-sm">
                     <span className="text-gray-600 dark:text-gray-400">{month.month}</span>
@@ -332,7 +441,7 @@ export default function AnalyticsPage() {
               การใช้จ่ายตามหมวดหมู่ (เดือนนี้)
             </h3>
             <div className="space-y-3">
-              {mockCategoryData.map((category, index) => (
+              {currentData.categoryData.map((category, index) => (
                 <div key={index} className="flex items-center justify-between">
                   <div className="flex items-center space-x-3">
                     <div className={`w-4 h-4 rounded-full ${category.color}`}></div>

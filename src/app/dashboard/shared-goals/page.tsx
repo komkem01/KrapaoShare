@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import DashboardLayout from '@/components/layout/DashboardLayout';
+import { toast } from 'sonner';
 
 export default function SharedGoalsPage() {
   const router = useRouter();
@@ -18,6 +19,23 @@ export default function SharedGoalsPage() {
     return result;
   };
 
+  // TODO: ✅ Backend API Ready!
+  // Backend now has /shared-goals and /shared-goal-members endpoints - integrate with real API:
+  //   GET    /shared-goals                                  - List shared goals
+  //   POST   /shared-goals                                  - Create shared goal
+  //   GET    /shared-goals/:id                              - Get goal details
+  //   PATCH  /shared-goals/:id                              - Update goal
+  //   DELETE /shared-goals/:id                              - Delete goal
+  //   GET    /shared-goal-members                           - List members
+  //   POST   /shared-goal-members                           - Add member
+  //   GET    /shared-goal-members/goal/:goalId              - Get goal members
+  //   GET    /shared-goal-members/user/:userId              - Get user's goals
+  //   GET    /shared-goal-members/goal/:goalId/user/:userId - Get specific membership
+  //   GET    /goal-contributions/goal/:goalId               - Get contributions
+  //   POST   /goal-contributions                            - Add contribution
+  //
+  // See src/utils/apiClient.ts for implementation
+  
   // Mock data - ในอนาคตจะเชื่อมกับ API
   const mockMyGoals = [
     {
@@ -210,9 +228,9 @@ export default function SharedGoalsPage() {
     if (foundGoal) {
       // TODO: เพิ่มผู้ใช้เข้ากลุ่ม
       console.log('Joining group:', foundGoal.id, 'Code:', joinGroupCode);
-      alert(`เข้าร่วมกลุ่ม "${foundGoal.name}" สำเร็จ!`);
+      toast.info(`เข้าร่วมกลุ่ม "${foundGoal.name}" สำเร็จ!`);
     } else {
-      alert('ไม่พบกลุ่มที่ตรงกับรหัสนี้');
+      toast.info('ไม่พบกลุ่มที่ตรงกับรหัสนี้');
     }
     
     // รีเซ็ตฟอร์ม

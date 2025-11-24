@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import DashboardLayout from '@/components/layout/DashboardLayout';
+import { toast } from '@/utils/toast';
 
 // Types
 interface Deposit {
@@ -146,7 +147,7 @@ export default function GoalDetailPage({ params }: PageProps) {
   // Add deposit
   const handleAddDeposit = () => {
     if (!goal || !depositAmount) {
-      alert('กรุณากรอกจำนวนเงิน');
+      toast.warning('ข้อมูลไม่ครบถ้วน', 'กรุณากรอกจำนวนเงิน');
       return;
     }
 
@@ -167,20 +168,20 @@ export default function GoalDetailPage({ params }: PageProps) {
     // Check if goal is completed
     if (newCurrentAmount >= goal.targetAmount && !goal.completedDate) {
       updatedGoal.completedDate = new Date().toISOString().split('T')[0];
-      setTimeout(() => alert('🎉 ยินดีด้วย! คุณบรรลุเป้าหมายแล้ว!'), 500);
+      setTimeout(() => toast.success('🎉 ยินดีด้วย!', 'คุณบรรลุเป้าหมายแล้ว!'), 500);
     }
 
     setGoal(updatedGoal);
     setShowDepositModal(false);
     setDepositAmount('');
     setDepositNote('');
-    alert('โอนเงินเข้าเป้าหมายสำเร็จ! 💰');
+    toast.success('โอนเงินสำเร็จ! 💰', `โอนเงิน ฿${amount.toLocaleString()} เข้าเป้าหมายเรียบร้อยแล้ว`);
   };
 
   // Edit goal
   const handleUpdateGoal = () => {
     if (!goal || !editForm.name || !editForm.targetAmount || !editForm.targetDate) {
-      alert('กรุณากรอกข้อมูลให้ครบถ้วน');
+      toast.warning('ข้อมูลไม่ครบถ้วน', 'กรุณากรอกข้อมูลให้ครบถ้วน');
       return;
     }
 
@@ -195,7 +196,7 @@ export default function GoalDetailPage({ params }: PageProps) {
 
     setGoal(updatedGoal);
     setShowEditModal(false);
-    alert('แก้ไขเป้าหมายสำเร็จ! ✅');
+    toast.success('แก้ไขเป้าหมายสำเร็จ! ✅', `แก้ไขเป้าหมาย "${editForm.name}" เรียบร้อยแล้ว`);
   };
 
   // Delete deposit
@@ -214,7 +215,7 @@ export default function GoalDetailPage({ params }: PageProps) {
       };
 
       setGoal(updatedGoal);
-      alert('ลบรายการฝากเรียบร้อยแล้ว! 🗑️');
+      toast.info('ลบรายการฝากเรียบร้อยแล้ว! 🗑️');
     }
   };
 

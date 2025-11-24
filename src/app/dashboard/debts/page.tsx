@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import DashboardLayout from '@/components/layout/DashboardLayout';
+import { toast } from 'sonner';
 
 interface Debt {
   id: number;
@@ -20,6 +21,22 @@ export default function DebtsPage() {
   const [showPayModal, setShowPayModal] = useState(false);
   const [showStatsModal, setShowStatsModal] = useState(false);
   const [selectedDebt, setSelectedDebt] = useState<Debt | null>(null);
+
+  // TODO: ✅ Backend API Ready!
+  // Backend now has /debts and /debt-payments endpoints - integrate with real API:
+  //   GET    /debts                    - List debts
+  //   POST   /debts                    - Create debt
+  //   GET    /debts/:id                - Get debt details
+  //   PATCH  /debts/:id                - Update debt (mark settled)
+  //   DELETE /debts/:id                - Delete debt
+  //   GET    /debts/creditor/:userId   - Debts where user is creditor
+  //   GET    /debts/debtor/:userId     - Debts where user is debtor
+  //   GET    /debt-payments            - List payments
+  //   POST   /debt-payments            - Record payment
+  //   GET    /debt-payments/debt/:debtId - Get debt payments
+  //   GET    /debt-payments/user/:userId - Get user's payments
+  //
+  // See src/utils/apiClient.ts for implementation
 
   // Mock data - ในอนาคตจะเชื่อมกับ API
   const [mockDebtorsOweMe, setMockDebtorsOweMe] = useState<Debt[]>([
@@ -101,7 +118,7 @@ export default function DebtsPage() {
   const confirmSendReminder = () => {
     if (selectedDebt) {
       // ส่งการแจ้งเตือน
-      alert(`ส่งการแจ้งเตือนให้ ${selectedDebt.person} เรียบร้อยแล้ว! 📱\nจำนวน: ฿${selectedDebt.amount.toLocaleString()}\nรายการ: ${selectedDebt.description}`);
+      toast.info(`ส่งการแจ้งเตือนให้ ${selectedDebt.person} เรียบร้อยแล้ว! 📱\nจำนวน: ฿${selectedDebt.amount.toLocaleString()}\nรายการ: ${selectedDebt.description}`);
       setShowReminderModal(false);
       setSelectedDebt(null);
     }
@@ -116,7 +133,7 @@ export default function DebtsPage() {
     if (selectedDebt) {
       // ลบหนี้จาก mockDebtorsOweMe
       setMockDebtorsOweMe(prev => prev.filter(d => d.id !== selectedDebt.id));
-      alert(`ยืนยันการรับเงินจาก ${selectedDebt.person} เรียบร้อยแล้ว! ✅\nจำนวน: ฿${selectedDebt.amount.toLocaleString()}`);
+      toast.info(`ยืนยันการรับเงินจาก ${selectedDebt.person} เรียบร้อยแล้ว! ✅\nจำนวน: ฿${selectedDebt.amount.toLocaleString()}`);
       setShowSettleModal(false);
       setSelectedDebt(null);
     }
@@ -131,7 +148,7 @@ export default function DebtsPage() {
     if (selectedDebt) {
       // ลบหนี้จาก mockDebtsIOwe
       setMockDebtsIOwe(prev => prev.filter(d => d.id !== selectedDebt.id));
-      alert(`ยืนยันการจ่ายเงินให้ ${selectedDebt.person} เรียบร้อยแล้ว! 💰\nจำนวน: ฿${selectedDebt.amount.toLocaleString()}`);
+      toast.info(`ยืนยันการจ่ายเงินให้ ${selectedDebt.person} เรียบร้อยแล้ว! 💰\nจำนวน: ฿${selectedDebt.amount.toLocaleString()}`);
       setShowPayModal(false);
       setSelectedDebt(null);
     }
@@ -140,9 +157,9 @@ export default function DebtsPage() {
   const handleSendAllReminders = () => {
     const pendingOweMeDebts = mockDebtorsOweMe.filter(debt => debt.status === 'pending');
     if (pendingOweMeDebts.length > 0) {
-      alert(`ส่งการแจ้งเตือนให้ ${pendingOweMeDebts.length} คน เรียบร้อยแล้ว! 📱\nรวม: ฿${pendingOweMeDebts.reduce((sum, debt) => sum + debt.amount, 0).toLocaleString()}`);
+      toast.info(`ส่งการแจ้งเตือนให้ ${pendingOweMeDebts.length} คน เรียบร้อยแล้ว! 📱\nรวม: ฿${pendingOweMeDebts.reduce((sum, debt) => sum + debt.amount, 0).toLocaleString()}`);
     } else {
-      alert('ไม่มีหนี้ที่ต้องแจ้งเตือน 🎉');
+      toast.info('ไม่มีหนี้ที่ต้องแจ้งเตือน 🎉');
     }
   };
 
@@ -159,9 +176,9 @@ export default function DebtsPage() {
         setMockDebtsIOwe(prev => prev.filter(d => d.id !== smallestDebt.id));
       }
       
-      alert(`เคลียร์หนี้ที่เล็กที่สุดเรียบร้อยแล้ว! 💰\n${smallestDebt.person}: ฿${smallestDebt.amount.toLocaleString()}\n${smallestDebt.description}`);
+      toast.info(`เคลียร์หนี้ที่เล็กที่สุดเรียบร้อยแล้ว! 💰\n${smallestDebt.person}: ฿${smallestDebt.amount.toLocaleString()}\n${smallestDebt.description}`);
     } else {
-      alert('ไม่มีหนี้ที่ต้องเคลียร์ 🎉');
+      toast.info('ไม่มีหนี้ที่ต้องเคลียร์ 🎉');
     }
   };
 

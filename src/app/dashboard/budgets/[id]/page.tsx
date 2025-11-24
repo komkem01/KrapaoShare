@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import DashboardLayout from '@/components/layout/DashboardLayout';
+import { toast } from 'sonner';
 
 // Types
 interface Transaction {
@@ -133,7 +134,7 @@ export default function BudgetDetailPage({ params }: PageProps) {
   // Add expense
   const handleAddExpense = () => {
     if (!budget || !newExpense.amount || !newExpense.description) {
-      alert('กรุณากรอกข้อมูลให้ครบถ้วน');
+      toast.info('กรุณากรอกข้อมูลให้ครบถ้วน');
       return;
     }
 
@@ -161,7 +162,7 @@ export default function BudgetDetailPage({ params }: PageProps) {
       description: '',
       date: new Date().toISOString().split('T')[0]
     });
-    alert('บันทึกรายจ่ายเรียบร้อยแล้ว! 💸');
+    toast.info('บันทึกรายจ่ายเรียบร้อยแล้ว! 💸');
   };
 
   // Edit budget
@@ -172,7 +173,7 @@ export default function BudgetDetailPage({ params }: PageProps) {
   const confirmEditBudget = () => {
     if (!budget) return;
     setShowEditModal(false);
-    alert('แก้ไขงบประมาณเรียบร้อยแล้ว! ✅');
+    toast.info('แก้ไขงบประมาณเรียบร้อยแล้ว! ✅');
   };
 
   // Delete transaction
@@ -191,7 +192,7 @@ export default function BudgetDetailPage({ params }: PageProps) {
           transactions: prev.transactions.filter(t => t.id !== transactionId)
         };
       });
-      alert('ลบรายการเรียบร้อยแล้ว! 🗑️');
+      toast.info('ลบรายการเรียบร้อยแล้ว! 🗑️');
     }
   };
 

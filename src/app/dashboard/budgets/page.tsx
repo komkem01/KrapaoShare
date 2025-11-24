@@ -1,8 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import DashboardLayout from '@/components/layout/DashboardLayout';
+import { useBudget, Budget as ApiBudget } from '@/contexts/BudgetContext';
+import { toast } from 'sonner';
 
 interface Budget {
   id: number;
@@ -23,6 +25,16 @@ interface Transaction {
 
 export default function BudgetsPage() {
   const router = useRouter();
+  const {
+    budgets,
+    loading,
+    error,
+    fetchBudgets,
+    createBudget,
+    updateBudget,
+    deleteBudget,
+  } = useBudget();
+
   const [activeTab, setActiveTab] = useState<'current' | 'history'>('current');
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -41,106 +53,63 @@ export default function BudgetsPage() {
     description: ''
   });
 
-  // Mock data - ในอนาคตจะเชื่อมกับ API
-  const [mockCurrentBudgets, setMockCurrentBudgets] = useState<Budget[]>([
-    {
-      id: 1,
-      category: 'อาหาร',
-      budgetAmount: 6000,
-      spentAmount: 2350,
-      month: '2025-11',
-      description: 'ค่าอาหารรายเดือน',
-      transactions: [
-        { date: '2025-11-14', amount: 350, description: 'ข้าวผัดกะเพรา + น้ำ' },
-        { date: '2025-11-13', amount: 250, description: 'ก๋วยเตี๋ยว + กาแฟ' },
-        { date: '2025-11-12', amount: 180, description: 'ข้าวมันไก่' }
-      ]
-    },
-    {
-      id: 2,
-      category: 'ค่าเดินทาง',
-      budgetAmount: 1500,
-      spentAmount: 1200,
-      month: '2025-11',
-      description: 'รถเมล์ แท็กซี่ Grab',
-      transactions: [
-        { date: '2025-11-14', amount: 60, description: 'รถเมล์ไป-กลับ' },
-        { date: '2025-11-13', amount: 280, description: 'แท็กซี่กลับบ้าน' }
-      ]
-    },
-    {
-      id: 3,
-      category: 'เสื้อผ้า',
-      budgetAmount: 2000,
-      spentAmount: 850,
-      month: '2025-11',
-      description: 'เสื้อผ้าและของใช้ส่วนตัว',
-      transactions: [
-        { date: '2025-11-12', amount: 850, description: 'เสื้อผ้า Uniqlo' }
-      ]
-    },
-    {
-      id: 4,
-      category: 'ความบันเทิง',
-      budgetAmount: 1000,
-      spentAmount: 170,
-      month: '2025-11',
-      description: 'หนัง คอนเสิร์ต เกม',
-      transactions: [
-        { date: '2025-11-10', amount: 170, description: 'ค่าหนังที่ SF' }
-      ]
-    }
-  ]);
+  // Load budgets on mount
+  useEffect(() => {
+    fetchBudgets();
+  }, [fetchBudgets]);
 
-  const [mockHistoryBudgets, setMockHistoryBudgets] = useState<Budget[]>([
-    {
-      id: 5,
-      category: 'อาหาร',
-      budgetAmount: 5500,
-      spentAmount: 5650,
-      month: '2025-10',
-      description: 'ค่าอาหารรายเดือน',
-      isCompleted: true
-    },
-    {
-      id: 6,
-      category: 'ค่าเดินทาง',
-      budgetAmount: 1500,
-      spentAmount: 1350,
-      month: '2025-10',
-      description: 'รถเมล์ แท็กซี่ Grab',
-      isCompleted: true
-    }
-  ]);
+  // Transform API data to UI format
+  const transformBudgetsToUI = (apiBudgets: ApiBudget[]): Budget[] => {
+    return apiBudgets.map(budget => ({
+      id: parseInt(budget.id),
+      category: budget.name || 'ไม่มีหมวดหมู่',
+      budgetAmount: budget.amount,
+      spentAmount: 0, // TODO: Add spent amount tracking
+      month: budget.period_start.substring(0, 7), // Extract YYYY-MM
+      description: budget.description || '',
+      transactions: [], // TODO: Add transaction integration if needed
+      isCompleted: budget.status === 'completed',
+    }));
+  };
 
-  const filteredBudgets = activeTab === 'current' ? mockCurrentBudgets : mockHistoryBudgets;
+  const uiBudgets = transformBudgetsToUI(budgets);
+  const currentMonth = new Date().toISOString().slice(0, 7);
+  const currentBudgets = uiBudgets.filter(budget => budget.month === currentMonth && !budget.isCompleted);
+  const historyBudgets = uiBudgets.filter(budget => budget.month !== currentMonth || budget.isCompleted);
+  
+  const filteredBudgets = activeTab === 'current' ? currentBudgets : historyBudgets;
 
-  const handleCreateBudget = () => {
+  const handleCreateBudget = async () => {
     if (!newBudget.category || !newBudget.amount) {
-      alert('กรุณากรอกข้อมูลให้ครบถ้วน');
+      toast.info('กรุณากรอกข้อมูลให้ครบถ้วน');
       return;
     }
 
-    const newId = Math.max(...mockCurrentBudgets.map(b => b.id), ...mockHistoryBudgets.map(b => b.id)) + 1;
-    const newBudgetData: Budget = {
-      id: newId,
-      category: newBudget.category,
-      budgetAmount: parseFloat(newBudget.amount),
-      spentAmount: 0,
-      month: newBudget.month,
-      description: newBudget.description,
-      transactions: []
-    };
+    try {
+      const startDate = newBudget.month + '-01';
+      const endDate = new Date(parseInt(newBudget.month.split('-')[0]), parseInt(newBudget.month.split('-')[1]), 0).toISOString().split('T')[0];
 
-    setMockCurrentBudgets(prev => [newBudgetData, ...prev]);
-    setShowCreateModal(false);
-    setNewBudget({
-      category: '',
-      amount: '',
-      month: new Date().toISOString().slice(0, 7),
-      description: ''
-    });
-    alert('ตั้งงบประมาณใหม่เรียบร้อยแล้ว! 🎯');
+      await createBudget({
+        name: newBudget.category,
+        amount: parseFloat(newBudget.amount),
+        period_start: startDate,
+        period_end: endDate,
+        description: newBudget.description,
+        user_id: '', // Will be set by context
+      });
+
+      await fetchBudgets();
+      setShowCreateModal(false);
+      setNewBudget({
+        category: '',
+        amount: '',
+        month: new Date().toISOString().slice(0, 7),
+        description: ''
+      });
+      toast.info('ตั้งงบประมาณใหม่เรียบร้อยแล้ว! 🎯');
+    } catch (err) {
+      toast.info('ไม่สามารถสร้างงบประมาณได้: ' + (err as Error).message);
+    }
   };
 
   const handleAddExpense = (budget: Budget) => {
@@ -149,28 +118,13 @@ export default function BudgetsPage() {
   };
 
   const confirmAddExpense = () => {
+    // TODO: Implement expense tracking with transaction API
     if (!selectedBudgetForExpense || !newExpense.amount || !newExpense.description) {
-      alert('กรุณากรอกข้อมูลให้ครบถ้วน');
+      toast.info('กรุณากรอกข้อมูลให้ครบถ้วน');
       return;
     }
 
-    const expenseAmount = parseFloat(newExpense.amount);
-    const newTransaction: Transaction = {
-      date: newExpense.date,
-      amount: expenseAmount,
-      description: newExpense.description
-    };
-
-    setMockCurrentBudgets(prev => prev.map(budget => 
-      budget.id === selectedBudgetForExpense.id
-        ? {
-            ...budget,
-            spentAmount: budget.spentAmount + expenseAmount,
-            transactions: [newTransaction, ...(budget.transactions || [])]
-          }
-        : budget
-    ));
-
+    // For now, just close the modal since we need transaction integration
     setShowExpenseModal(false);
     setSelectedBudgetForExpense(null);
     setNewExpense({
@@ -178,7 +132,7 @@ export default function BudgetsPage() {
       description: '',
       date: new Date().toISOString().split('T')[0]
     });
-    alert('บันทึกรายจ่ายเรียบร้อยแล้ว! 💸');
+    toast.info('การบันทึกรายจ่ายจะเชื่อมต่อกับ Transaction API ในอนาคต');
   };
 
   const handleEditBudget = (budget: Budget) => {
@@ -186,33 +140,50 @@ export default function BudgetsPage() {
     setShowEditModal(true);
   };
 
-  const confirmEditBudget = () => {
+  const confirmEditBudget = async () => {
     if (!editingBudget) return;
 
-    setMockCurrentBudgets(prev => prev.map(budget => 
-      budget.id === editingBudget.id ? editingBudget : budget
-    ));
+    try {
+      const startDate = editingBudget.month + '-01';
+      const endDate = new Date(parseInt(editingBudget.month.split('-')[0]), parseInt(editingBudget.month.split('-')[1]), 0).toISOString().split('T')[0];
 
-    setShowEditModal(false);
-    setEditingBudget(null);
-    alert('แก้ไขงบประมาณเรียบร้อยแล้ว! ✅');
+      await updateBudget(editingBudget.id.toString(), {
+        name: editingBudget.category,
+        amount: editingBudget.budgetAmount,
+        period_start: startDate,
+        period_end: endDate,
+        description: editingBudget.description,
+      });
+
+      await fetchBudgets();
+      setShowEditModal(false);
+      setEditingBudget(null);
+      toast.info('แก้ไขงบประมาณเรียบร้อยแล้ว! ✅');
+    } catch (err) {
+      toast.info('ไม่สามารถแก้ไขงบประมาณได้: ' + (err as Error).message);
+    }
   };
 
-  const handleReuseBudget = (budget: Budget) => {
-    const currentMonth = new Date().toISOString().slice(0, 7);
-    const newId = Math.max(...mockCurrentBudgets.map(b => b.id), ...mockHistoryBudgets.map(b => b.id)) + 1;
-    
-    const reusedBudget: Budget = {
-      ...budget,
-      id: newId,
-      month: currentMonth,
-      spentAmount: 0,
-      transactions: [],
-      isCompleted: undefined
-    };
+  const handleReuseBudget = async (budget: Budget) => {
+    try {
+      const currentMonth = new Date().toISOString().slice(0, 7);
+      const startDate = currentMonth + '-01';
+      const endDate = new Date(parseInt(currentMonth.split('-')[0]), parseInt(currentMonth.split('-')[1]), 0).toISOString().split('T')[0];
 
-    setMockCurrentBudgets(prev => [reusedBudget, ...prev]);
-    alert('ใช้งบประมาณนี้อีกครั้งเรียบร้อยแล้ว! 🔄');
+      await createBudget({
+        name: budget.category,
+        amount: budget.budgetAmount,
+        period_start: startDate,
+        period_end: endDate,
+        description: budget.description,
+        user_id: '', // Will be set by context
+      });
+
+      await fetchBudgets();
+      toast.info('ใช้งบประมาณนี้อีกครั้งเรียบร้อยแล้ว! 🔄');
+    } catch (err) {
+      toast.info('ไม่สามารถสร้างงบประมาณซ้ำได้: ' + (err as Error).message);
+    }
   };
 
   const handleViewDetails = (budgetId: number) => {
@@ -223,7 +194,7 @@ export default function BudgetsPage() {
     const overBudget = budget.spentAmount > budget.budgetAmount;
     const percentage = Math.round((budget.spentAmount / budget.budgetAmount) * 100);
     
-    alert(`📊 สรุปงบประมาณ ${budget.category}
+    toast.info(`📊 สรุปงบประมาณ ${budget.category}
     
 🎯 งบที่ตั้งไว้: ฿${budget.budgetAmount.toLocaleString()}
 💰 ใช้จ่ายจริง: ฿${budget.spentAmount.toLocaleString()}
@@ -232,8 +203,8 @@ ${overBudget ? '⚠️ เกินงบประมาณ!' : '✅ อยู�
 📅 เดือน: ${new Date(budget.month + '-01').toLocaleDateString('th-TH', { year: 'numeric', month: 'long' })}`);
   };
 
-  const totalBudget = mockCurrentBudgets.reduce((sum, budget) => sum + budget.budgetAmount, 0);
-  const totalSpent = mockCurrentBudgets.reduce((sum, budget) => sum + budget.spentAmount, 0);
+  const totalBudget = currentBudgets.reduce((sum, budget) => sum + budget.budgetAmount, 0);
+  const totalSpent = currentBudgets.reduce((sum, budget) => sum + budget.spentAmount, 0);
   const remainingBudget = totalBudget - totalSpent;
 
   const categories = ['อาหาร', 'ค่าเดินทาง', 'เสื้อผ้า', 'ความบันเทิง', 'สุขภาพ', 'การศึกษา', 'ของใช้ในบ้าน', 'อื่นๆ'];
@@ -341,7 +312,7 @@ ${overBudget ? '⚠️ เกินงบประมาณ!' : '✅ อยู�
                   : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300'
               }`}
             >
-              งบประมาณปัจจุบัน ({mockCurrentBudgets.length})
+              งบประมาณปัจจุบัน ({currentBudgets.length})
             </button>
             <button
               onClick={() => setActiveTab('history')}
@@ -351,14 +322,30 @@ ${overBudget ? '⚠️ เกินงบประมาณ!' : '✅ อยู�
                   : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300'
               }`}
             >
-              ประวัติ ({mockHistoryBudgets.length})
+              ประวัติ ({historyBudgets.length})
             </button>
           </nav>
         </div>
 
-        {/* Budgets List */}
-        <div className="grid gap-6">
-          {filteredBudgets.map((budget) => {
+        {/* Error Message */}
+        {error && (
+          <div className="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-700 text-red-700 dark:text-red-300 px-4 py-3 rounded-xl">
+            {error}
+          </div>
+        )}
+
+        {/* Loading State */}
+        {loading ? (
+          <div className="text-center py-12">
+            <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 dark:border-white"></div>
+            <p className="mt-4 text-gray-500 dark:text-gray-400">กำลังโหลดงบประมาณ...</p>
+          </div>
+        ) : (
+          <>
+            {/* Budgets List */}
+            <div className="grid gap-6">
+              {filteredBudgets.length > 0 ? (
+                filteredBudgets.map((budget) => {
             const percentageUsed = (budget.spentAmount / budget.budgetAmount) * 100;
             const isOverBudget = budget.spentAmount > budget.budgetAmount;
             const isNearLimit = percentageUsed > 80 && !isOverBudget;
@@ -504,8 +491,17 @@ ${overBudget ? '⚠️ เกินงบประมาณ!' : '✅ อยู�
                 </div>
               </div>
             );
-          })}
-        </div>
+                })
+              ) : (
+                <div className="text-center py-12">
+                  <p className="text-gray-500 dark:text-gray-400">
+                    {activeTab === 'current' ? 'ยังไม่มีงบประมาณในเดือนนี้' : 'ยังไม่มีประวัติงบประมาณ'}
+                  </p>
+                </div>
+              )}
+            </div>
+          </>
+        )}
 
         {/* Budget Tips */}
         <div className="bg-blue-50 dark:bg-blue-900 rounded-lg p-6">

@@ -3,13 +3,14 @@
 import { useState, useEffect } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { useCategories, Category } from "@/contexts/CategoryContext";
-import { useTypes, Type, TypeFormData } from "@/contexts/TypeContext";
+import { TRANSACTION_TYPES } from "@/constants/types";
 import { apiClient } from "@/utils/apiClient";
 import {
   clearAuthData,
   setStoredUser,
   getStoredTokens,
 } from "@/utils/authStorage";
+import { toast } from "@/utils/toast";
 
 // API Response Types for /auth/me endpoint
 interface UserResponse {
@@ -165,8 +166,13 @@ type SettingsTab =
   | "security"
   | "notifications"
   | "preferences"
-  | "categories"
-  | "types";
+  | "categories";
+
+// Helper function to get type info from ID
+const getTypeInfo = (typeId: string | undefined | null) => {
+  if (!typeId) return null;
+  return Object.values(TRANSACTION_TYPES).find(t => t.id === typeId) || null;
+};
 
 export default function SettingsPage() {
   const {
@@ -179,21 +185,11 @@ export default function SettingsPage() {
     error: categoryError,
   } = useCategories();
 
-  const {
-    types,
-    addType,
-    updateType,
-    deleteType,
-    refreshTypes,
-    isLoading: isLoadingTypes,
-    error: typesError,
-  } = useTypes();
-
   const [activeTab, setActiveTab] = useState<SettingsTab>("profile");
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [showSuccessMessage, setShowSuccessMessage] = useState(false);
-  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [showDeleteAccountModal, setShowDeleteAccountModal] = useState(false);
   const [showChangePasswordModal, setShowChangePasswordModal] = useState(false);
   const [passwordData, setPasswordData] = useState({
     currentPassword: "",
@@ -255,16 +251,13 @@ export default function SettingsPage() {
     type_id: "", // เพิ่ม type_id
   });
 
-  // Types management states
-  const [showTypeModal, setShowTypeModal] = useState(false);
-  const [editingType, setEditingType] = useState<Type | null>(null);
-  const [typeForm, setTypeForm] = useState<TypeFormData>({
-    name: "",
-    icon: "📝",
-    color: "#3b82f6",
-    description: "",
-    is_active: true,
-  });
+  // Delete confirmation modal states
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deletingCategory, setDeletingCategory] = useState<{
+    id: string | number;
+    name: string;
+    type: "income" | "expense";
+  } | null>(null);
 
   // Audit logs for security tab
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
@@ -384,20 +377,9 @@ export default function SettingsPage() {
             "Debug - Fetching Types first for user:",
             userResponse.id
           );
-          try {
-            await refreshTypes();
-            console.log(
-              "Debug - Types loaded successfully, count:",
-              types.length
-            );
-            console.log("Debug - Types data:", types);
-          } catch (typeError) {
-            console.warn("Failed to load types:", typeError);
-            // ถ้าไม่สามารถดึงประเภทได้ ให้แสดงเตือนแต่ยังคงดำเนินการต่อ
-          }
-
-          // ขั้นตอนที่ 2: ดึงข้อมูลหมวดหมู่ (Categories) หลังจากได้ Types แล้ว
-          console.log("Debug - Fetching Categories after Types...");
+          
+          // ขั้นตอนที่ 2: ดึงข้อมูลหมวดหมู่ (Categories)
+          console.log("Debug - Fetching Categories...");
           try {
             await refreshCategories();
             console.log("Debug - Categories loaded successfully");
@@ -581,19 +563,6 @@ export default function SettingsPage() {
     console.log("Debug - userData state changed:", userData);
   }, [userData]);
 
-  // Debug types changes
-  useEffect(() => {
-    console.log("Debug - types state changed:", types);
-    console.log("Debug - types loading:", isLoadingTypes);
-    console.log("Debug - types error:", typesError);
-    console.log("Debug - types data details:", types.map(t => ({id: t.id, name: t.name, active: t.is_active})));
-    
-    // Force re-render when types change
-    if (types.length > 0) {
-      console.log("Debug - Types loaded successfully, count:", types.length);
-    }
-  }, [types, isLoadingTypes, typesError]);
-
   // Fetch audit logs when security tab is active
   useEffect(() => {
     if (activeTab === "security" && currentUserId && auditLogs.length === 0) {
@@ -622,7 +591,7 @@ export default function SettingsPage() {
     updates: Partial<CombinedSettingsRequest>
   ) => {
     if (!currentUserId) {
-      alert("ไม่พบข้อมูลผู้ใช้ กรุณาเข้าสู่ระบบใหม่");
+      toast.info("ไม่พบข้อมูลผู้ใช้ กรุณาเข้าสู่ระบบใหม่");
       return false;
     }
 
@@ -657,7 +626,7 @@ export default function SettingsPage() {
         setTimeout(() => (window.location.href = "/auth/login"), 2000);
       }
 
-      alert("เกิดข้อผิดพลาด: " + errorMessage);
+      toast.info("เกิดข้อผิดพลาด: " + errorMessage);
       return false;
     }
   };
@@ -667,7 +636,7 @@ export default function SettingsPage() {
     updates: Partial<NotificationSettingsRequest>
   ) => {
     if (!currentUserId) {
-      alert("ไม่พบข้อมูลผู้ใช้ กรุณาเข้าสู่ระบบใหม่");
+      toast.info("ไม่พบข้อมูลผู้ใช้ กรุณาเข้าสู่ระบบใหม่");
       return false;
     }
 
@@ -738,7 +707,7 @@ export default function SettingsPage() {
         setTimeout(() => (window.location.href = "/auth/login"), 2000);
       }
 
-      alert("เกิดข้อผิดพลาด: " + errorMessage);
+      toast.info("เกิดข้อผิดพลาด: " + errorMessage);
       return false;
     }
   };
@@ -794,14 +763,14 @@ export default function SettingsPage() {
 
     if (!currentUserId) {
       console.error("Debug - No currentUserId available");
-      alert("ไม่พบข้อมูลผู้ใช้ กรุณาเข้าสู่ระบบใหม่");
+      toast.error("ไม่พบข้อมูลผู้ใช้", "กรุณาเข้าสู่ระบบใหม่");
       return;
     }
 
     // Validate currentUserId format
     if (typeof currentUserId !== "string" || currentUserId.trim() === "") {
       console.error("Debug - Invalid currentUserId format:", currentUserId);
-      alert("รูปแบบ User ID ไม่ถูกต้อง กรุณาเข้าสู่ระบบใหม่");
+      toast.error("รูปแบบ User ID ไม่ถูกต้อง", "กรุณาเข้าสู่ระบบใหม่");
       return;
     }
 
@@ -812,18 +781,21 @@ export default function SettingsPage() {
       // Validate required fields
       if (!userData.firstName.trim()) {
         setError("กรุณากรอกชื่อ");
+        toast.warning("ข้อมูลไม่ครบถ้วน", "กรุณากรอกชื่อ");
         setIsSaving(false);
         return;
       }
 
       if (!userData.lastName.trim()) {
         setError("กรุณากรอกนามสกุล");
+        toast.warning("ข้อมูลไม่ครบถ้วน", "กรุณากรอกนามสกุล");
         setIsSaving(false);
         return;
       }
 
       if (!userData.email.trim()) {
         setError("กรุณากรอกอีเมล");
+        toast.warning("ข้อมูลไม่ครบถ้วน", "กรุณากรอกอีเมล");
         setIsSaving(false);
         return;
       }
@@ -832,6 +804,7 @@ export default function SettingsPage() {
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       if (!emailRegex.test(userData.email)) {
         setError("รูปแบบอีเมลไม่ถูกต้อง");
+        toast.error("รูปแบบอีเมลไม่ถูกต้อง", "กรุณากรอกอีเมลให้ถูกต้อง");
         setIsSaving(false);
         return;
       }
@@ -907,7 +880,7 @@ export default function SettingsPage() {
       setIsEditing(false);
       setShowSuccessMessage(true);
       setTimeout(() => setShowSuccessMessage(false), 3000);
-      alert("✅ อัปเดตข้อมูลส่วนตัวสำเร็จ!");
+      toast.success("อัปเดตข้อมูลสำเร็จ! ✅", "ข้อมูลส่วนตัวของคุณได้รับการอัปเดตเรียบร้อยแล้ว");
     } catch (error: unknown) {
       const err = error as {
         message?: string;
@@ -994,7 +967,7 @@ export default function SettingsPage() {
 
       setError(errorMessage);
       setIsSaving(false);
-      alert("❌ เกิดข้อผิดพลาด:\n" + errorMessage);
+      toast.error("เกิดข้อผิดพลาด", errorMessage);
     }
   };
 
@@ -1004,22 +977,22 @@ export default function SettingsPage() {
       !passwordData.newPassword ||
       !passwordData.confirmPassword
     ) {
-      alert("กรุณากรอกข้อมูลให้ครบถ้วน");
+      toast.warning("ข้อมูลไม่ครบถ้วน", "กรุณากรอกข้อมูลให้ครบถ้วน");
       return;
     }
 
     if (passwordData.newPassword !== passwordData.confirmPassword) {
-      alert("รหัสผ่านใหม่ไม่ตรงกัน");
+      toast.error("รหัสผ่านไม่ตรงกัน", "รหัสผ่านใหม่และยืนยันรหัสผ่านไม่ตรงกัน");
       return;
     }
 
     if (passwordData.newPassword.length < 6) {
-      alert("รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร");
+      toast.warning("รหัสผ่านสั้นเกินไป", "รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร");
       return;
     }
 
     if (passwordData.currentPassword.length < 6) {
-      alert("รหัสผ่านปัจจุบันต้องมีอย่างน้อย 6 ตัวอักษร");
+      toast.warning("รหัสผ่านสั้นเกินไป", "รหัสผ่านปัจจุบันต้องมีอย่างน้อย 6 ตัวอักษร");
       return;
     }
 
@@ -1045,9 +1018,7 @@ export default function SettingsPage() {
       });
       setShowSuccessMessage(true);
       setTimeout(() => setShowSuccessMessage(false), 3000);
-      alert(
-        "🔐 เปลี่ยนรหัสผ่านสำเร็จ!\nกรุณาใช้รหัสผ่านใหม่ในการเข้าสู่ระบบครั้งต่อไป"
-      );
+      toast.success("เปลี่ยนรหัสผ่านสำเร็จ! 🔐", "กรุณาใช้รหัสผ่านใหม่ในการเข้าสู่ระบบครั้งต่อไป");
     } catch (error: unknown) {
       const err = error as { message?: string; status?: number };
       console.error("Failed to change password:", err);
@@ -1068,13 +1039,13 @@ export default function SettingsPage() {
       }
 
       setError(errorMessage);
-      alert("❌ เกิดข้อผิดพลาด: " + errorMessage);
+      toast.error("เกิดข้อผิดพลาด", errorMessage);
     }
   };
 
   const handleToggleTwoFactor = async () => {
     if (!currentUserId) {
-      alert("ไม่พบข้อมูลผู้ใช้ กรุณาเข้าสู่ระบบใหม่");
+      toast.error("ไม่พบข้อมูลผู้ใช้", "กรุณาเข้าสู่ระบบใหม่");
       return;
     }
 
@@ -1093,11 +1064,9 @@ export default function SettingsPage() {
       setTimeout(() => setShowSuccessMessage(false), 3000);
 
       if (newTwoFactorState) {
-        alert(
-          "🔐 เปิดใช้งานการยืนยันตัวตนแบบสองขั้นตอนแล้ว!\nบัญชีของคุณมีความปลอดภัยมากขึ้น"
-        );
+        toast.success("เปิดใช้งาน 2FA สำเร็จ! 🔐", "บัญชีของคุณมีความปลอดภัยมากขึ้น");
       } else {
-        alert("⚠️ ปิดใช้งานการยืนยันตัวตนแบบสองขั้นตอนแล้ว");
+        toast.warning("ปิดใช้งาน 2FA แล้ว ⚠️", "การยืนยันตัวตนแบบสองขั้นตอนถูกปิดใช้งาน");
       }
     } catch (error: unknown) {
       const err = error as { message?: string; status?: number };
@@ -1111,7 +1080,7 @@ export default function SettingsPage() {
       }
 
       setError(errorMessage);
-      alert("เกิดข้อผิดพลาด: " + errorMessage);
+      toast.error("เกิดข้อผิดพลาด", errorMessage);
     } finally {
       setIsSaving(false);
     }
@@ -1119,7 +1088,7 @@ export default function SettingsPage() {
 
   const handleExportData = async () => {
     if (!currentUserId) {
-      alert("ไม่พบข้อมูลผู้ใช้ กรุณาเข้าสู่ระบบใหม่");
+      toast.error("ไม่พบข้อมูลผู้ใช้", "กรุณาเข้าสู่ระบบใหม่");
       return;
     }
 
@@ -1177,7 +1146,7 @@ export default function SettingsPage() {
 
       setShowSuccessMessage(true);
       setTimeout(() => setShowSuccessMessage(false), 3000);
-      alert("📁 ส่งออกข้อมูลสำเร็จ!\nไฟล์ข้อมูลถูกดาวน์โหลดแล้ว");
+      toast.success("ส่งออกข้อมูลสำเร็จ! 📁", "ไฟล์ข้อมูลถูกดาวน์โหลดแล้ว");
     } catch (error: unknown) {
       const err = error as { message?: string; status?: number };
       console.error("Failed to export data:", err);
@@ -1211,9 +1180,7 @@ export default function SettingsPage() {
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
 
-      alert(
-        "⚠️ ส่งออกข้อมูลท้องถิ่นสำเร็จ\nไม่สามารถเชื่อมต่อ API ได้ แต่ส่งออกข้อมูลที่มีอยู่แล้ว"
-      );
+      toast.warning("ส่งออกข้อมูลท้องถิ่นสำเร็จ ⚠️", "ไม่สามารถเชื่อมต่อ API ได้ แต่ส่งออกข้อมูลที่มีอยู่แล้ว");
     } finally {
       setIsSaving(false);
     }
@@ -1267,16 +1234,14 @@ export default function SettingsPage() {
 
       const clearedMessage =
         clearedItems.length > 0
-          ? `🧹 ล้างแคชสำเร็จ!\n\nรายการที่ล้าง:\n• ${clearedItems.join(
-              "\n• "
-            )}\n\nแนะนำให้รีเฟรชหน้าเว็บเพื่อประสิทธิภาพที่ดีที่สุด`
-          : "✅ ไม่พบข้อมูลแคชที่ต้องล้าง";
+          ? `ล้างแคชสำเร็จ! 🧹\n\nรายการที่ล้าง:\n• ${clearedItems.join("\n• ")}\n\nแนะนำให้รีเฟรชหน้าเว็บเพื่อประสิทธิภาพที่ดีที่สุด`
+          : "ไม่พบข้อมูลแคชที่ต้องล้าง ✅";
 
-      alert(clearedMessage);
+      toast.success("ล้างแคชสำเร็จ! 🧹", clearedMessage);
     } catch (error) {
       console.error("Failed to clear cache:", error);
       setError("ไม่สามารถล้างแคชได้อย่างสมบูรณ์");
-      alert("⚠️ เกิดข้อผิดพลาดขณะล้างแคช กรุณาลองใหม่อีกครั้ง");
+      toast.error("เกิดข้อผิดพลาด ⚠️", "ไม่สามารถล้างแคชได้ กรุณาลองใหม่อีกครั้ง");
     } finally {
       setIsSaving(false);
     }
@@ -1288,7 +1253,7 @@ export default function SettingsPage() {
 
   const confirmDeleteAccount = async () => {
     if (!currentUserId) {
-      alert("ไม่พบข้อมูลผู้ใช้");
+      toast.error("ไม่พบข้อมูลผู้ใช้", "กรุณาเข้าสู่ระบบใหม่");
       return;
     }
 
@@ -1305,7 +1270,7 @@ export default function SettingsPage() {
       setIsSaving(false);
       setShowDeleteModal(false);
 
-      alert("🗑️ ลบบัญชีสำเร็จ\nข้อมูลทั้งหมดของคุณได้ถูกลบออกจากระบบแล้ว");
+      toast.success("ลบบัญชีสำเร็จ 🗑️", "ข้อมูลทั้งหมดของคุณได้ถูกลบออกจากระบบแล้ว");
 
       // Redirect to home page after account deletion
       setTimeout(() => {
@@ -1329,7 +1294,7 @@ export default function SettingsPage() {
 
       setError(errorMessage);
       setIsSaving(false);
-      alert("เกิดข้อผิดพลาด: " + errorMessage);
+      toast.error("เกิดข้อผิดพลาด", errorMessage);
     }
   };
 
@@ -1359,7 +1324,7 @@ export default function SettingsPage() {
 
       setShowSuccessMessage(true);
       setTimeout(() => setShowSuccessMessage(false), 3000);
-      alert("✅ ยกเลิกเซสชันสำเร็จ");
+      toast.info("✅ ยกเลิกเซสชันสำเร็จ");
     } catch (error: unknown) {
       const err = error as { message?: string; status?: number };
       console.error("Failed to revoke session:", err);
@@ -1374,7 +1339,7 @@ export default function SettingsPage() {
       }
 
       setError(errorMessage);
-      alert("เกิดข้อผิดพลาด: " + errorMessage);
+      toast.info("เกิดข้อผิดพลาด: " + errorMessage);
     } finally {
       setIsSaving(false);
     }
@@ -1406,24 +1371,17 @@ export default function SettingsPage() {
     { id: "notifications", name: "การแจ้งเตือน", icon: "🔔" },
     { id: "preferences", name: "การตั้งค่า", icon: "⚙️" },
     { id: "categories", name: "หมวดหมู่", icon: "📁" },
-    { id: "types", name: "ประเภท", icon: "📝" },
   ];
 
   // Category management functions
   const handleAddCategory = (type: "income" | "expense") => {
-    // ตรวจสอบว่าประเภทถูกโหลดแล้วหรือไม่
-    if (isLoadingTypes) {
-      alert("กรุณารอให้ประเภทโหลดเสร็จก่อน");
-      return;
-    }
-
     setCategoryModalType(type);
     setEditingCategory(null);
     setCategoryForm({
       name: "",
       icon: type === "income" ? "💰" : "💳",
       color: type === "income" ? "#22c55e" : "#ef4444",
-      type_id: "", // รีเซ็ต type_id
+      type_id: type === "income" ? TRANSACTION_TYPES.INCOME.id : TRANSACTION_TYPES.EXPENSE.id,
     });
   };
 
@@ -1437,10 +1395,10 @@ export default function SettingsPage() {
       await refreshCategories();
       setShowSuccessMessage(true);
       setTimeout(() => setShowSuccessMessage(false), 3000);
-      alert("รีเซ็ตหมวดหมู่สำเร็จ! 🎉\nหมวดหมู่ถูกซิงค์ตามข้อมูลล่าสุดแล้ว");
+      toast.info("รีเซ็ตหมวดหมู่สำเร็จ! 🎉\nหมวดหมู่ถูกซิงค์ตามข้อมูลล่าสุดแล้ว");
     } catch (error) {
       console.error("Failed to reset categories:", error);
-      alert("ไม่สามารถรีเซ็ตหมวดหมู่ได้ กรุณาลองใหม่อีกครั้ง");
+      toast.info("ไม่สามารถรีเซ็ตหมวดหมู่ได้ กรุณาลองใหม่อีกครั้ง");
     } finally {
       setIsSaving(false);
     }
@@ -1472,8 +1430,10 @@ export default function SettingsPage() {
           editingCategory.id,
           categoryForm
         );
+        toast.success("แก้ไขหมวดหมู่สำเร็จ", `แก้ไขหมวดหมู่ "${categoryForm.name}" เรียบร้อยแล้ว`);
       } else {
         await addCategory(categoryModalType, categoryForm);
+        toast.success("เพิ่มหมวดหมู่สำเร็จ", `เพิ่มหมวดหมู่ "${categoryForm.name}" เรียบร้อยแล้ว`);
       }
 
       setCategoryModalType(null);
@@ -1483,7 +1443,7 @@ export default function SettingsPage() {
       setTimeout(() => setShowSuccessMessage(false), 3000);
     } catch (error) {
       console.error("Failed to save category:", error);
-      alert("ไม่สามารถบันทึกหมวดหมู่ได้");
+      toast.error("เกิดข้อผิดพลาด", "ไม่สามารถบันทึกหมวดหมู่ได้");
     } finally {
       setIsSaving(false);
     }
@@ -1500,134 +1460,38 @@ export default function SettingsPage() {
 
     // ป้องกันการลบหมวดหมู่สุดท้าย
     if (categories[type].length === 1) {
-      alert(
-        `ไม่สามารถลบหมวดหมู่${
-          type === "income" ? "รายรับ" : "รายจ่าย"
-        }สุดท้ายได้ กรุณาเพิ่มหมวดหมู่ใหม่ก่อน`
-      );
+      setDeletingCategory({
+        id: categoryId,
+        name: category.name,
+        type: type
+      });
+      setShowDeleteModal(true);
       return;
     }
 
-    const confirmMessage = `ต้องการลบหมวดหมู่ "${category.name}" หรือไม่?\n\n⚠️ หมวดหมู่ที่ถูกลบจะไม่สามารถกู้คืนได้ และรายการที่ใช้หมวดหมู่นี้จะต้องจัดหมวดหมู่ใหม่`;
+    // เปิด modal ยืนยันการลบ
+    setDeletingCategory({
+      id: categoryId,
+      name: category.name,
+      type: type
+    });
+    setShowDeleteModal(true);
+  };
 
-    if (!confirm(confirmMessage)) return;
+  const confirmDeleteCategory = async () => {
+    if (!deletingCategory) return;
 
     setIsSaving(true);
     try {
-      await deleteCategory(type, String(categoryId));
+      await deleteCategory(deletingCategory.type, String(deletingCategory.id));
+      toast.success("ลบหมวดหมู่สำเร็จ", `ลบหมวดหมู่ "${deletingCategory.name}" เรียบร้อยแล้ว`);
       setShowSuccessMessage(true);
       setTimeout(() => setShowSuccessMessage(false), 3000);
+      setShowDeleteModal(false);
+      setDeletingCategory(null);
     } catch (error) {
       console.error("Failed to delete category:", error);
-      alert("ไม่สามารถลบหมวดหมู่ได้");
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  // Type management functions
-  const handleAddType = () => {
-    setEditingType(null);
-    setTypeForm({
-      name: "",
-      icon: "📝",
-      color: "#3b82f6",
-      description: "",
-      is_active: true,
-    });
-    setShowTypeModal(true);
-  };
-
-  const handleEditType = (type: Type) => {
-    setEditingType(type);
-    setTypeForm({
-      name: type.name,
-      icon: type.icon,
-      color: type.color,
-      description: type.description || "",
-      is_active: type.is_active,
-    });
-    setShowTypeModal(true);
-  };
-
-  const handleSaveType = async () => {
-    if (!typeForm.name.trim()) {
-      alert("กรุณากรอกชื่อประเภท");
-      return;
-    }
-
-    setIsSaving(true);
-
-    try {
-      if (editingType) {
-        await updateType(editingType.id, typeForm);
-      } else {
-        await addType(typeForm);
-      }
-
-      setShowTypeModal(false);
-      setEditingType(null);
-      setTypeForm({
-        name: "",
-        icon: "📝",
-        color: "#3b82f6",
-        description: "",
-        is_active: true,
-      });
-
-      setShowSuccessMessage(true);
-      setTimeout(() => setShowSuccessMessage(false), 3000);
-    } catch (error) {
-      console.error("Failed to save type:", error);
-      alert(
-        error instanceof Error ? error.message : "ไม่สามารถบันทึกประเภทได้"
-      );
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  const handleDeleteType = async (
-    typeId: string | number,
-    typeName: string
-  ) => {
-    const confirmMessage = `ต้องการลบประเภท "${typeName}" หรือไม่?\n\n⚠️ ประเภทที่ถูกลบจะไม่สามารถกู้คืนได้`;
-
-    if (!confirm(confirmMessage)) return;
-
-    setIsSaving(true);
-    try {
-      await deleteType(typeId);
-      setShowSuccessMessage(true);
-      setTimeout(() => setShowSuccessMessage(false), 3000);
-    } catch (error) {
-      console.error("Failed to delete type:", error);
-      alert(error instanceof Error ? error.message : "ไม่สามารถลบประเภทได้");
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  const handleToggleTypeStatus = async (type: Type) => {
-    setIsSaving(true);
-    try {
-      await updateType(type.id, {
-        name: type.name,
-        icon: type.icon,
-        color: type.color,
-        description: type.description,
-        is_active: !type.is_active,
-      });
-
-      setShowSuccessMessage(true);
-      setTimeout(() => setShowSuccessMessage(false), 3000);
-    } catch (error) {
-      console.error("Failed to toggle type status:", error);
-      alert(
-        error instanceof Error
-          ? error.message
-          : "ไม่สามารถเปลี่ยนสถานะประเภทได้"
-      );
+      toast.error("เกิดข้อผิดพลาด", "ไม่สามารถลบหมวดหมู่ได้");
     } finally {
       setIsSaving(false);
     }
@@ -1655,9 +1519,7 @@ export default function SettingsPage() {
                 กำลังโหลดข้อมูล...
               </p>
               <p className="text-sm text-gray-500 dark:text-gray-500 mt-2">
-                {isLoadingTypes
-                  ? "กำลังโหลดประเภท..."
-                  : isLoadingCategories
+                {isLoadingCategories
                   ? "กำลังโหลดหมวดหมู่..."
                   : "กำลังโหลดข้อมูลผู้ใช้..."}
               </p>
@@ -2373,101 +2235,34 @@ export default function SettingsPage() {
                 {activeTab === "categories" && (
                   <div className="p-6">
                     <div className="mb-6">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <h2 className="text-lg font-light text-gray-900 dark:text-white">
-                            จัดการหมวดหมู่
-                          </h2>
-                          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                            กำหนดและจัดการหมวดหมู่สำหรับรายรับและรายจ่าย
-                          </p>
-                          {(categoryError || typesError) && (
-                            <div className="text-sm mt-2 space-y-1">
-                              {typesError && (
-                                <p className="text-red-500 dark:text-red-400">
-                                  ❌ ประเภท: {typesError}
-                                </p>
-                              )}
-                              {categoryError && (
-                                <p className="text-red-500 dark:text-red-400">
-                                  ❌ หมวดหมู่: {categoryError}
-                                </p>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                        <div className="flex space-x-2">
-                          <button
-                            onClick={async () => {
-                              setIsSaving(true);
-                              try {
-                                await refreshTypes();
-                                await refreshCategories();
-                                alert("รีเฟรชข้อมูลสำเร็จ! 🎉");
-                              } catch (error) {
-                                console.error("Failed to refresh data:", error);
-                                alert(
-                                  "ไม่สามารถรีเฟรชข้อมูลได้ กรุณาลองใหม่อีกครั้ง"
-                                );
-                              } finally {
-                                setIsSaving(false);
-                              }
-                            }}
-                            disabled={
-                              isSaving || isLoadingTypes || isLoadingCategories
-                            }
-                            className="px-3 py-1.5 text-sm font-light border border-blue-200 dark:border-blue-700 text-blue-600 dark:text-blue-400 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors disabled:opacity-50 flex items-center space-x-1"
-                            title="รีเฟรชข้อมูลประเภทและหมวดหมู่"
-                          >
-                            <span>🔄</span>
-                            <span className="hidden sm:inline">รีเฟรช</span>
-                          </button>
-                          <button
-                            onClick={handleResetCategories}
-                            disabled={isSaving || isLoadingCategories}
-                            className="px-3 py-1.5 text-sm font-light border border-orange-200 dark:border-orange-700 text-orange-600 dark:text-orange-400 rounded-lg hover:bg-orange-50 dark:hover:bg-orange-900/20 transition-colors disabled:opacity-50 flex items-center space-x-1"
-                            title="รีเซ็ตหมวดหมู่กลับเป็นค่าเริ่มต้น"
-                          >
-                            <span>🔄</span>
-                            <span className="hidden sm:inline">รีเซ็ต</span>
-                          </button>
-                        </div>
+                      <div>
+                        <h2 className="text-lg font-light text-gray-900 dark:text-white">
+                          จัดการหมวดหมู่
+                        </h2>
+                        <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                          กำหนดและจัดการหมวดหมู่สำหรับรายรับและรายจ่าย
+                        </p>
+                        {categoryError && (
+                          <div className="text-sm mt-2 space-y-1">
+                            <p className="text-red-500 dark:text-red-400">
+                              ❌ หมวดหมู่: {categoryError}
+                            </p>
+                          </div>
+                        )}
                       </div>
                     </div>
 
-                    {(isLoadingCategories || isLoadingTypes) && (
+                    {isLoadingCategories && (
                       <div className="flex items-center justify-center py-6">
                         <div className="text-sm text-gray-500 dark:text-gray-400 flex items-center space-x-2">
                           <div className="w-4 h-4 border-2 border-gray-300 border-t-transparent rounded-full animate-spin" />
-                          <span>
-                            {isLoadingTypes
-                              ? "กำลังโหลดประเภท..."
-                              : isLoadingCategories
-                              ? "กำลังโหลดหมวดหมู่..."
-                              : "กำลังซิงค์ข้อมูล..."}
-                          </span>
+                          <span>กำลังโหลดหมวดหมู่...</span>
                         </div>
                       </div>
                     )}
 
                     {/* Summary Stats */}
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-                      <div className="bg-gradient-to-r from-purple-50 to-indigo-50 dark:from-purple-900/20 dark:to-indigo-900/20 border border-purple-200 dark:border-purple-700 rounded-lg p-4">
-                        <div className="flex items-center space-x-3">
-                          <div className="w-10 h-10 bg-purple-500 rounded-lg flex items-center justify-center">
-                            <span className="text-white text-lg">📝</span>
-                          </div>
-                          <div>
-                            <p className="text-sm text-purple-600 dark:text-purple-400 font-medium">
-                              ประเภท
-                            </p>
-                            <p className="text-2xl font-light text-purple-700 dark:text-purple-300">
-                              {types.length}
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
                       <div className="bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 border border-green-200 dark:border-green-700 rounded-lg p-4">
                         <div className="flex items-center space-x-3">
                           <div className="w-10 h-10 bg-green-500 rounded-lg flex items-center justify-center">
@@ -2577,18 +2372,10 @@ export default function SettingsPage() {
                                       {category.type_id && (
                                         <span className="text-xs text-gray-500 dark:text-gray-400">
                                           {
-                                            types.find(
-                                              (t) =>
-                                                String(t.id) ===
-                                                String(category.type_id)
-                                            )?.icon
+                                            getTypeInfo(category.type_id)?.icon
                                           }{" "}
-                                          {category.type_name ||
-                                            types.find(
-                                              (t) =>
-                                                String(t.id) ===
-                                                String(category.type_id)
-                                            )?.name}
+                                          {category.type_id &&
+                                            getTypeInfo(category.type_id)?.name}
                                         </span>
                                       )}
                                     </div>
@@ -2686,18 +2473,10 @@ export default function SettingsPage() {
                                       {category.type_id && (
                                         <span className="text-xs text-gray-500 dark:text-gray-400">
                                           {
-                                            types.find(
-                                              (t) =>
-                                                String(t.id) ===
-                                                String(category.type_id)
-                                            )?.icon
+                                            getTypeInfo(category.type_id)?.icon
                                           }{" "}
-                                          {category.type_name ||
-                                            types.find(
-                                              (t) =>
-                                                String(t.id) ===
-                                                String(category.type_id)
-                                            )?.name}
+                                          {category.type_id &&
+                                            getTypeInfo(category.type_id)?.name}
                                         </span>
                                       )}
                                     </div>
@@ -2880,237 +2659,6 @@ export default function SettingsPage() {
                           </button>
                         </div>
                       </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Types Tab */}
-                {activeTab === "types" && (
-                  <div className="p-6">
-                    <div className="flex items-center justify-between mb-6">
-                      <div>
-                        <h2 className="text-lg font-light text-gray-900 dark:text-white">
-                          จัดการประเภท
-                        </h2>
-                        <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                          จัดการประเภทสำหรับจำแนกข้อมูลต่างๆ ในระบบ
-                        </p>
-                      </div>
-                      <div className="flex space-x-2">
-                        <button
-                          onClick={refreshTypes}
-                          disabled={isLoadingTypes}
-                          className="bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white px-4 py-2 rounded-lg flex items-center space-x-2 transition-colors text-sm"
-                        >
-                          <span>🔄</span>
-                          <span>{isLoadingTypes ? 'กำลังโหลด...' : 'รีเฟรช'}</span>
-                        </button>
-                        <button
-                          onClick={handleAddType}
-                          disabled={isSaving}
-                          className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white px-4 py-2 rounded-lg flex items-center space-x-2 transition-colors text-sm"
-                        >
-                          <span>➕</span>
-                          <span>เพิ่มประเภท</span>
-                        </button>
-                      </div>
-                    </div>
-
-                    {isLoadingTypes && (
-                      <div className="flex items-center justify-center py-6">
-                        <div className="text-center">
-                          <div className="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-gray-900 dark:border-white mb-2"></div>
-                          <p className="text-sm text-gray-600 dark:text-gray-400">
-                            กำลังโหลดข้อมูล...
-                          </p>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Summary Stats */}
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                      <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
-                              ประเภททั้งหมด
-                            </p>
-                            <p className="text-xl font-bold text-gray-900 dark:text-white">
-                              {types.length}
-                            </p>
-                          </div>
-                          <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900 rounded-lg flex items-center justify-center">
-                            <span className="text-lg">📝</span>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
-                              ใช้งาน
-                            </p>
-                            <p className="text-xl font-bold text-green-600 dark:text-green-400">
-                              {types.filter((t) => t.is_active).length}
-                            </p>
-                          </div>
-                          <div className="w-10 h-10 bg-green-100 dark:bg-green-900 rounded-lg flex items-center justify-center">
-                            <span className="text-lg">✅</span>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
-                              ไม่ใช้งาน
-                            </p>
-                            <p className="text-xl font-bold text-red-600 dark:text-red-400">
-                              {types.filter((t) => !t.is_active).length}
-                            </p>
-                          </div>
-                          <div className="w-10 h-10 bg-red-100 dark:bg-red-900 rounded-lg flex items-center justify-center">
-                            <span className="text-lg">❌</span>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Error Display for Types */}
-                    {typesError && (
-                      <div className="mb-4 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 rounded-lg">
-                        <div className="flex items-center space-x-3">
-                          <span className="text-red-500 text-lg">⚠️</span>
-                          <div>
-                            <p className="text-red-600 dark:text-red-400 font-medium">เกิดข้อผิดพลาดในการโหลดประเภท</p>
-                            <p className="text-red-500 dark:text-red-300 text-sm mt-1">{typesError}</p>
-                          </div>
-                        </div>
-                        <button
-                          onClick={refreshTypes}
-                          disabled={isLoadingTypes}
-                          className="mt-3 px-3 py-1 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 text-sm"
-                        >
-                          {isLoadingTypes ? 'กำลังโหลด...' : 'ลองใหม่'}
-                        </button>
-                      </div>
-                    )}
-
-                    <div className="space-y-4">
-                      {isLoadingTypes ? (
-                        <div className="text-center py-8">
-                          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
-                          <p className="text-gray-600 dark:text-gray-400">กำลังโหลดประเภท...</p>
-                        </div>
-                      ) : types.length === 0 ? (
-                        <div className="text-center py-8">
-                          <div className="text-gray-400 text-4xl mb-4">📝</div>
-                          <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
-                            {typesError ? 'ไม่สามารถโหลดประเภทได้' : 'ยังไม่มีประเภท'}
-                          </h3>
-                          <p className="text-gray-600 dark:text-gray-400 mb-4">
-                            {typesError ? 'กรุณาลองโหลดใหม่อีกครั้ง' : 'เริ่มต้นสร้างประเภทแรกของคุณ'}
-                          </p>
-                          <div className="space-x-2">
-                            {typesError ? (
-                              <button
-                                onClick={refreshTypes}
-                                disabled={isLoadingTypes}
-                                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
-                              >
-                                {isLoadingTypes ? 'กำลังโหลด...' : 'ลองใหม่'}
-                              </button>
-                            ) : (
-                              <button
-                                onClick={handleAddType}
-                                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                              >
-                                เพิ่มประเภทใหม่
-                              </button>
-                            )}
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="space-y-3">
-                          {/* Debug info
-                          <div className="mb-2 p-2 bg-yellow-50 dark:bg-yellow-900/20 rounded text-xs">
-                            Debug: types = {JSON.stringify(types.slice(0,2))}
-                            <br />Loading = {isLoadingTypes.toString()}, Error = {typesError || 'none'}
-                            <br />Array length = {types.length} */}
-                          {/* </div> */}
-                          {types.map((type) => (
-                            <div
-                              key={type.id}
-                              className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700 rounded-lg"
-                            >
-                              <div className="flex items-center space-x-4">
-                                <div
-                                  className="w-10 h-10 rounded-lg flex items-center justify-center"
-                                  style={{
-                                    backgroundColor: type.color + "20",
-                                    color: type.color,
-                                  }}
-                                >
-                                  <span className="text-lg">{type.icon}</span>
-                                </div>
-                                <div>
-                                  <div className="flex items-center space-x-2">
-                                    <h3 className="font-medium text-gray-900 dark:text-white">
-                                      {type.name}
-                                    </h3>
-                                    <span
-                                      className={`px-2 py-1 rounded-full text-xs font-medium ${
-                                        type.is_active
-                                          ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
-                                          : "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200"
-                                      }`}
-                                    >
-                                      {type.is_active ? "ใช้งาน" : "ไม่ใช้งาน"}
-                                    </span>
-                                  </div>
-                                  {type.description && (
-                                    <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                                      {type.description}
-                                    </p>
-                                  )}
-                                </div>
-                              </div>
-
-                              <div className="flex items-center space-x-2">
-                                <button
-                                  onClick={() => handleToggleTypeStatus(type)}
-                                  disabled={isSaving}
-                                  className={`px-3 py-1 rounded-lg text-xs font-medium transition-colors disabled:opacity-50 ${
-                                    type.is_active
-                                      ? "bg-red-100 text-red-700 hover:bg-red-200 dark:bg-red-900 dark:text-red-300"
-                                      : "bg-green-100 text-green-700 hover:bg-green-200 dark:bg-green-900 dark:text-green-300"
-                                  }`}
-                                >
-                                  {type.is_active ? "ปิด" : "เปิด"}
-                                </button>
-                                <button
-                                  onClick={() => handleEditType(type)}
-                                  disabled={isSaving}
-                                  className="px-3 py-1 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors text-xs font-medium disabled:opacity-50 dark:bg-blue-900 dark:text-blue-300"
-                                >
-                                  แก้ไข
-                                </button>
-                                <button
-                                  onClick={() =>
-                                    handleDeleteType(type.id, type.name)
-                                  }
-                                  disabled={isSaving}
-                                  className="px-3 py-1 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors text-xs font-medium disabled:opacity-50 dark:bg-red-900 dark:text-red-300"
-                                >
-                                  ลบ
-                                </button>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      )}
                     </div>
                   </div>
                 )}
@@ -3514,41 +3062,6 @@ export default function SettingsPage() {
                       />
                     </div>
 
-                    {/* Type Selection */}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        ประเภท
-                      </label>
-                      <select
-                        value={categoryForm.type_id}
-                        onChange={(e) =>
-                          setCategoryForm({
-                            ...categoryForm,
-                            type_id: e.target.value,
-                          })
-                        }
-                        disabled={isLoadingTypes}
-                        className="w-full px-4 py-3 border border-gray-200 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 dark:bg-gray-700 dark:text-white disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        <option value="">
-                          {isLoadingTypes
-                            ? "กำลังโหลดประเภท..."
-                            : "ไม่ระบุประเภท"}
-                        </option>
-                        {!isLoadingTypes &&
-                          types
-                            .filter((t) => t.is_active)
-                            .map((type) => (
-                              <option key={type.id} value={type.id}>
-                                {type.icon} {type.name}
-                              </option>
-                            ))}
-                      </select>
-                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                        เลือกประเภทเพื่อจัดกลุ่มหมวดหมู่ (ไม่บังคับ)
-                      </p>
-                    </div>
-
                     <div>
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                         ไอคอน
@@ -3647,194 +3160,110 @@ export default function SettingsPage() {
           </div>
         )}
 
-        {/* Type Modal */}
-        {showTypeModal && (
-          <div className="fixed inset-0 z-50 overflow-y-auto">
-            <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
-              <div
-                className="fixed inset-0 transition-opacity backdrop-blur-sm"
-                onClick={() => setShowTypeModal(false)}
-              >
-                <div className="absolute inset-0 bg-gray-900/80 dark:bg-black/80"></div>
+        {/* Delete Confirmation Modal */}
+        {showDeleteModal && deletingCategory && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fadeIn">
+            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-md w-full transform transition-all animate-scaleIn">
+              {/* Header */}
+              <div className="p-6 border-b border-gray-200 dark:border-gray-700">
+                <div className="flex items-center space-x-4">
+                  <div className="w-12 h-12 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center flex-shrink-0">
+                    <svg className="w-6 h-6 text-red-600 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="text-xl font-semibold text-gray-900 dark:text-white">
+                      ยืนยันการลบหมวดหมู่
+                    </h3>
+                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                      การดำเนินการนี้ไม่สามารถย้อนกลับได้
+                    </p>
+                  </div>
+                </div>
               </div>
 
-              <div className="inline-block align-bottom bg-white dark:bg-gray-800 rounded-2xl text-left overflow-hidden shadow-2xl transform transition-all sm:my-8 sm:align-middle sm:max-w-md sm:w-full relative z-10 border border-gray-200 dark:border-gray-700">
-                {/* Header */}
-                <div className="relative bg-gradient-to-r from-blue-500 to-indigo-600 px-6 py-4">
-                  <div className="absolute inset-0 bg-white/10 backdrop-blur-sm"></div>
-                  <div className="relative flex items-center justify-between">
-                    <div className="flex items-center space-x-3">
-                      <span className="text-xl">📝</span>
-                      <h3 className="text-lg font-semibold text-white">
-                        {editingType ? "แก้ไขประเภท" : "เพิ่มประเภทใหม่"}
-                      </h3>
+              {/* Content */}
+              <div className="p-6 space-y-4">
+                {categories[deletingCategory.type].length === 1 ? (
+                  <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
+                    <div className="flex items-start space-x-3">
+                      <svg className="w-5 h-5 text-yellow-600 dark:text-yellow-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                      </svg>
+                      <div className="flex-1">
+                        <p className="text-sm font-medium text-yellow-800 dark:text-yellow-200">
+                          ไม่สามารถลบหมวดหมู่ได้
+                        </p>
+                        <p className="text-sm text-yellow-700 dark:text-yellow-300 mt-1">
+                          ไม่สามารถลบหมวดหมู่{deletingCategory.type === "income" ? "รายรับ" : "รายจ่าย"}สุดท้ายได้ กรุณาเพิ่มหมวดหมู่ใหม่ก่อน
+                        </p>
+                      </div>
                     </div>
-                    <button
-                      onClick={() => setShowTypeModal(false)}
-                      className="w-8 h-8 bg-white/20 hover:bg-white/30 rounded-lg flex items-center justify-center text-white transition-colors duration-200"
-                    >
-                      ✕
-                    </button>
                   </div>
-                </div>
-
-                <div className="bg-white dark:bg-gray-800 px-6 py-6">
-                  <div className="space-y-4">
-                    {/* Name */}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        ชื่อประเภท *
-                      </label>
-                      <input
-                        type="text"
-                        value={typeForm.name}
-                        onChange={(e) =>
-                          setTypeForm({
-                            ...typeForm,
-                            name: e.target.value,
-                          })
-                        }
-                        className="w-full px-4 py-3 border border-gray-200 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 dark:bg-gray-700 dark:text-white"
-                        placeholder="กรอกชื่อประเภท"
-                        required
-                      />
-                    </div>
-
-                    {/* Description */}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        คำอธิบาย
-                      </label>
-                      <textarea
-                        value={typeForm.description}
-                        onChange={(e) =>
-                          setTypeForm({
-                            ...typeForm,
-                            description: e.target.value,
-                          })
-                        }
-                        rows={3}
-                        className="w-full px-4 py-3 border border-gray-200 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 dark:bg-gray-700 dark:text-white"
-                        placeholder="คำอธิบายประเภท (ไม่บังคับ)"
-                      />
-                    </div>
-
-                    {/* Icon Selection */}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        ไอคอน
-                      </label>
-                      <div className="grid grid-cols-8 gap-2 p-3 border border-gray-200 dark:border-gray-600 rounded-xl max-h-32 overflow-y-auto">
-                        {predefinedTypeIcons.map((icon) => (
-                          <button
-                            key={icon}
-                            type="button"
-                            onClick={() => setTypeForm({ ...typeForm, icon })}
-                            className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all duration-200 ${
-                              typeForm.icon === icon
-                                ? "bg-blue-500 text-white shadow-lg"
-                                : "hover:bg-gray-100 dark:hover:bg-gray-700"
-                            }`}
-                          >
-                            {icon}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Color Selection */}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        สี
-                      </label>
-                      <div className="grid grid-cols-5 gap-2 p-3 border border-gray-200 dark:border-gray-600 rounded-xl">
-                        {predefinedColors.map((color) => (
-                          <button
-                            key={color}
-                            type="button"
-                            onClick={() => setTypeForm({ ...typeForm, color })}
-                            className={`w-8 h-8 rounded-lg transition-all duration-200 ${
-                              typeForm.color === color
-                                ? "ring-2 ring-offset-2 ring-gray-400 dark:ring-offset-gray-800"
-                                : ""
-                            }`}
-                            style={{ backgroundColor: color }}
-                          />
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Status */}
-                    <div>
-                      <label className="flex items-center space-x-3">
-                        <input
-                          type="checkbox"
-                          checked={typeForm.is_active}
-                          onChange={(e) =>
-                            setTypeForm({
-                              ...typeForm,
-                              is_active: e.target.checked,
-                            })
-                          }
-                          className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600"
-                        />
-                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                          เปิดใช้งาน
-                        </span>
-                      </label>
-                    </div>
-
-                    {/* Preview */}
-                    <div className="border border-gray-200 dark:border-gray-600 rounded-lg p-4">
-                      <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        ตัวอย่าง:
-                      </p>
-                      <div className="flex items-center space-x-3">
-                        <div
-                          className="w-10 h-10 rounded-lg flex items-center justify-center"
-                          style={{
-                            backgroundColor: typeForm.color + "20",
-                            color: typeForm.color,
-                          }}
-                        >
-                          <span className="text-lg">{typeForm.icon}</span>
-                        </div>
-                        <div>
-                          <p className="font-medium text-gray-900 dark:text-white">
-                            {typeForm.name || "ชื่อประเภท"}
+                ) : (
+                  <div>
+                    <p className="text-gray-700 dark:text-gray-300 mb-4">
+                      ต้องการลบหมวดหมู่{" "}
+                      <span className="font-semibold text-gray-900 dark:text-white">
+                        "{deletingCategory.name}"
+                      </span>{" "}
+                      หรือไม่?
+                    </p>
+                    <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
+                      <div className="flex items-start space-x-3">
+                        <svg className="w-5 h-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <div className="flex-1">
+                          <p className="text-sm font-medium text-red-800 dark:text-red-200">
+                            คำเตือน
                           </p>
-                          {typeForm.description && (
-                            <p className="text-sm text-gray-600 dark:text-gray-400">
-                              {typeForm.description}
-                            </p>
-                          )}
+                          <p className="text-sm text-red-700 dark:text-red-300 mt-1">
+                            หมวดหมู่ที่ถูกลบจะไม่สามารถกู้คืนได้ และรายการที่ใช้หมวดหมู่นี้จะต้องจัดหมวดหมู่ใหม่
+                          </p>
                         </div>
                       </div>
                     </div>
                   </div>
-                </div>
+                )}
+              </div>
 
-                <div className="bg-gradient-to-r from-gray-50/80 to-gray-100/80 dark:from-gray-700/80 dark:to-gray-800/80 px-6 py-4 border-t border-gray-200/50 dark:border-gray-600/50">
-                  <div className="flex space-x-4">
-                    <button
-                      onClick={() => setShowTypeModal(false)}
-                      className="flex-1 px-6 py-3 border-2 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-700 transition-all duration-200 font-medium"
-                    >
-                      ยกเลิก
-                    </button>
-                    <button
-                      onClick={handleSaveType}
-                      disabled={isSaving || !typeForm.name.trim()}
-                      className="flex-1 px-6 py-3 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 disabled:from-gray-400 disabled:to-gray-500 text-white rounded-xl transition-all duration-200 font-medium disabled:cursor-not-allowed"
-                    >
-                      {isSaving
-                        ? "กำลังบันทึก..."
-                        : editingType
-                        ? "บันทึกการแก้ไข"
-                        : "เพิ่มประเภท"}
-                    </button>
-                  </div>
-                </div>
+              {/* Footer */}
+              <div className="p-6 bg-gray-50 dark:bg-gray-900/50 rounded-b-2xl border-t border-gray-200 dark:border-gray-700 flex space-x-3">
+                <button
+                  onClick={() => {
+                    setShowDeleteModal(false);
+                    setDeletingCategory(null);
+                  }}
+                  className="flex-1 px-4 py-2.5 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors font-medium"
+                >
+                  ยกเลิก
+                </button>
+                {categories[deletingCategory.type].length > 1 && (
+                  <button
+                    onClick={confirmDeleteCategory}
+                    disabled={isSaving}
+                    className="flex-1 px-4 py-2.5 bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white rounded-lg transition-all font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
+                  >
+                    {isSaving ? (
+                      <>
+                        <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        <span>กำลังลบ...</span>
+                      </>
+                    ) : (
+                      <>
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                        <span>ลบหมวดหมู่</span>
+                      </>
+                    )}
+                  </button>
+                )}
               </div>
             </div>
           </div>

@@ -70,6 +70,30 @@ export const getStoredTokens = () => {
   };
 };
 
+export const setStoredTokens = (
+  accessToken: string,
+  refreshToken: string,
+  expiresAt?: string
+) => {
+  if (typeof window === "undefined") return;
+
+  localStorage.setItem(AUTH_STORAGE_KEYS.accessToken, accessToken);
+  localStorage.setItem(AUTH_STORAGE_KEYS.refreshToken, refreshToken);
+  if (expiresAt) {
+    localStorage.setItem(AUTH_STORAGE_KEYS.expiresAt, expiresAt);
+  }
+
+  Cookies.set(AUTH_COOKIE_KEYS.accessToken, accessToken, {
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+  });
+
+  Cookies.set(AUTH_COOKIE_KEYS.refreshToken, refreshToken, {
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+  });
+};
+
 export const getStoredUser = () => {
   if (typeof window === "undefined") return null;
   const userRaw = localStorage.getItem(AUTH_STORAGE_KEYS.user);

@@ -1,18 +1,24 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import DashboardLayout from '@/components/layout/DashboardLayout';
-import AccountSelector, { Account } from '@/components/ui/AccountSelector';
 import CategorySelector, { useCategorySelector } from '@/components/ui/CategorySelector';
-import { useNotifications, createNotification } from '@/contexts/NotificationContext';
+import { useNotifications } from '@/contexts/NotificationContext';
+import { useAccounts, type Account } from '@/contexts/AccountContext';
+import { useTransactions } from '@/contexts/TransactionContext';
+import { getStoredUser } from '@/utils/authStorage';
+import { accountTransactionApi } from '@/utils/apiClient';
+import type { CreateTransactionRequest } from '@/types/transaction';
 
 export default function AddTransactionPage() {
   const router = useRouter();
   const { addNotification } = useNotifications();
+  const { accounts, refreshAccounts, updateBalance, isLoading: accountsLoading } = useAccounts();
+  const { createTransaction } = useTransactions();
   
   const [activeTab, setActiveTab] = useState<'expense' | 'income'>('expense');
-  const [selectedAccountId, setSelectedAccountId] = useState<number | null>(null);
+  const [selectedAccountId, setSelectedAccountId] = useState<string | null>(null);
   const [amount, setAmount] = useState('');
   const [description, setDescription] = useState('');
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
@@ -22,86 +28,159 @@ export default function AddTransactionPage() {
   const expenseCategory = useCategorySelector('expense');
   const incomeCategory = useCategorySelector('income');
 
-  // ดึงข้อมูลบัญชีจำลอง (ในอนาคตจะเชื่อมกับ API)
-  const mockAccounts: Account[] = [
-    { id: 1, name: 'บัญชีออมทรัพย์ SCB', type: 'personal', balance: 25000, bank: 'ธนาคารไทยพาณิชย์', accountNumber: 'xxx-x-x1234-x' },
-    { id: 2, name: 'บัญชีกระแสรายวัน BBL', type: 'personal', balance: 8500, bank: 'ธนาคารกรุงเทพ', accountNumber: 'xxx-x-x5678-x' },
-    { id: 3, name: 'กลุ่มเพื่อนบ้าน - ค่าส่วนกลาง', type: 'shared', balance: 12000, bank: 'กลุ่ม', accountNumber: 'shared-001' }
-  ];
+  // Load accounts on mount
+  useEffect(() => {
+    console.log('Loading accounts...');
+    refreshAccounts().catch(err => {
+      console.error('Failed to refresh accounts:', err);
+    });
+  }, [refreshAccounts]);
 
-  const selectedAccount = mockAccounts.find(acc => acc.id === selectedAccountId);
+  // Debug logging
+  useEffect(() => {
+    console.log('Accounts state:', accounts);
+    console.log('Accounts loading:', accountsLoading);
+  }, [accounts, accountsLoading]);
+
+  const safeAccounts = (accounts ?? []).filter(
+    (account): account is Account => Boolean(account && account.id)
+  );
+
+  useEffect(() => {
+    if (accounts && accounts.some(account => !account || !account.id)) {
+      console.warn('Detected invalid account entries from API response:', accounts);
+    }
+  }, [accounts]);
+
+  const selectedAccount = safeAccounts.find(acc => acc.id === selectedAccountId);
   const currentCategory = activeTab === 'expense' ? expenseCategory : incomeCategory;
 
   const handleSubmit = async () => {
+    // ตรวจสอบว่าข้อมูลบัญชีโหลดเสร็จแล้ว
+    if (accountsLoading || !accounts) {
+      await addNotification({
+        title: 'กำลังโหลดข้อมูล',
+        message: 'กรุณารอสักครู่ ระบบกำลังโหลดข้อมูลบัญชี',
+        type: 'warning',
+        priority: 'normal'
+      });
+      return;
+    }
+
     // Validation
     if (!selectedAccountId) {
-      addNotification(createNotification.error('ข้อมูลไม่ครบถ้วน', 'กรุณาเลือกบัญชีที่จะทำรายการ', 'transaction'));
+      await addNotification({
+        title: 'ข้อมูลไม่ครบถ้วน',
+        message: 'กรุณาเลือกบัญชีที่จะทำรายการ',
+        type: 'error',
+        priority: 'high'
+      });
       return;
     }
 
     if (!currentCategory.selectedCategory) {
-      addNotification(createNotification.error('ข้อมูลไม่ครบถ้วน', 'กรุณาเลือกหมวดหมู่', 'transaction'));
+      await addNotification({
+        title: 'ข้อมูลไม่ครบถ้วน',
+        message: 'กรุณาเลือกหมวดหมู่',
+        type: 'error',
+        priority: 'high'
+      });
       return;
     }
 
     if (!amount || parseFloat(amount) <= 0) {
-      addNotification(createNotification.error('จำนวนเงินไม่ถูกต้อง', 'กรุณากรอกจำนวนเงินที่ถูกต้อง', 'transaction'));
+      await addNotification({
+        title: 'จำนวนเงินไม่ถูกต้อง',
+        message: 'กรุณากรอกจำนวนเงินที่ถูกต้อง',
+        type: 'error',
+        priority: 'high'
+      });
       return;
     }
 
     if (!description.trim()) {
-      addNotification(createNotification.error('ข้อมูลไม่ครบถ้วน', 'กรุณากรอกรายละเอียด', 'transaction'));
+      await addNotification({
+        title: 'ข้อมูลไม่ครบถ้วน',
+        message: 'กรุณากรอกรายละเอียด',
+        type: 'error',
+        priority: 'high'
+      });
       return;
     }
 
-    // ตรวจสอบยอดเงินสำหรับรายจ่าย
-    if (activeTab === 'expense' && selectedAccount && selectedAccount.balance < parseFloat(amount)) {
-      addNotification(createNotification.error('ยอดเงินไม่เพียงพอ', 'ยอดเงินในบัญชีไม่เพียงพอสำหรับรายการนี้', 'transaction'));
+    // ตรวจสอบยอดเงินสำหรับรายจ่าย (ใช้ข้อมูลล่าสุด)
+  const latestAccount = safeAccounts.find(acc => acc.id === selectedAccountId);
+    if (activeTab === 'expense' && latestAccount && latestAccount.current_balance < parseFloat(amount)) {
+      await addNotification({
+        title: 'ยอดเงินไม่เพียงพอ',
+        message: 'ยอดเงินในบัญชีไม่เพียงพอสำหรับรายการนี้',
+        type: 'error',
+        priority: 'high'
+      });
       return;
     }
 
     setIsSubmitting(true);
 
     try {
-      // จำลองการบันทึกข้อมูล (ในอนาคตจะเรียก API จริง)
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      const storedUser = getStoredUser();
+      if (!storedUser?.id) {
+        throw new Error('ไม่พบข้อมูลผู้ใช้ กรุณาเข้าสู่ระบบใหม่');
+      }
 
-      const transactionData = {
-        id: Date.now(), // ใช้ timestamp เป็น ID ชั่วคราว
-        type: activeTab,
+      const transactionPayload: CreateTransactionRequest = {
+        userId: storedUser.id,
         accountId: selectedAccountId,
-        categoryId: currentCategory.selectedCategory?.id,
-        category: currentCategory.selectedCategory?.name || '',
+        categoryId: currentCategory.selectedCategory?.id || null,
+        type: activeTab,
         amount: parseFloat(amount),
-        description,
-        date,
-        time: new Date().toLocaleTimeString('th-TH', { 
-          hour: '2-digit', 
-          minute: '2-digit' 
-        })
+        description: description.trim(),
+        transactionDate: date,
+        transactionTime: new Date().toTimeString().split(' ')[0], // HH:MM:SS format
+        isRecurring: false,
       };
 
-      // บันทึกลง localStorage
-      const existingTransactions = JSON.parse(localStorage.getItem('transactions') || '[]');
-      const updatedTransactions = [transactionData, ...existingTransactions];
-      localStorage.setItem('transactions', JSON.stringify(updatedTransactions));
+      const result = await createTransaction(transactionPayload);
+      console.log('Transaction created:', result);
 
-      console.log('Transaction saved:', transactionData);
+      // Create account transaction record and update balance
+      if (selectedAccountId) {
+        // Create account transaction record first
+        await accountTransactionApi.create({
+          user_id: storedUser.id,
+          account_id: selectedAccountId,
+          transaction_type: activeTab === 'expense' ? 'withdraw' : 'deposit',
+          amount: parseFloat(amount),
+          note: `${activeTab === 'expense' ? 'รายจ่าย' : 'รายรับ'}: ${description.trim()}`,
+          category_id: currentCategory.selectedCategory?.id
+        });
+
+        // Then update account balance
+        await updateBalance(selectedAccountId, {
+          amount: parseFloat(amount),
+          operation: activeTab === 'expense' ? 'subtract' : 'add',
+          note: `${activeTab === 'expense' ? 'รายจ่าย' : 'รายรับ'}: ${description.trim()}`
+        });
+      }
+
+      // Refresh accounts to update balances after transaction
+      await refreshAccounts();
 
       // รีเซ็ตฟอร์ม
       setAmount('');
       setDescription('');
       currentCategory.reset();
       setDate(new Date().toISOString().split('T')[0]);
+      setSelectedAccountId(null);
 
       // แสดงการแจ้งเตือนสำเร็จ
-      addNotification(
-        createNotification.success(
-          'บันทึกสำเร็จ',
-          `บันทึก${activeTab === 'expense' ? 'รายจ่าย' : 'รายรับ'} ${parseFloat(amount).toLocaleString()} บาท`,
-          'transaction'
-        )
-      );
+      await addNotification({
+        title: 'บันทึกสำเร็จ',
+        message: `บันทึก${activeTab === 'expense' ? 'รายจ่าย' : 'รายรับ'} ${parseFloat(amount).toLocaleString()} บาท`,
+        type: 'success',
+        priority: 'normal',
+        action_url: '/dashboard/transactions'
+      });
 
       // กลับไปหน้า Transactions
       setTimeout(() => {
@@ -110,7 +189,12 @@ export default function AddTransactionPage() {
 
     } catch (error) {
       console.error('Error saving transaction:', error);
-      addNotification(createNotification.error('เกิดข้อผิดพลาด', 'ไม่สามารถบันทึกรายการได้ กรุณาลองใหม่อีกครั้ง', 'transaction'));
+      await addNotification({
+        title: 'เกิดข้อผิดพลาด',
+        message: 'ไม่สามารถบันทึกรายการได้ กรุณาลองใหม่อีกครั้ง',
+        type: 'error',
+        priority: 'high'
+      });
     } finally {
       setIsSubmitting(false);
     }
@@ -167,12 +251,28 @@ export default function AddTransactionPage() {
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 เลือกบัญชี <span className="text-red-500">*</span>
               </label>
-              <AccountSelector
-                accounts={mockAccounts}
-                selectedAccountId={selectedAccountId}
-                onSelect={(account) => setSelectedAccountId(account.id)}
-                placeholder="เลือกบัญชีที่ต้องการทำรายการ"
-              />
+              {accountsLoading ? (
+                <div className="w-full px-4 py-3 border border-gray-200 dark:border-gray-600 rounded-xl bg-gray-50 dark:bg-gray-700 text-gray-500 dark:text-gray-400">
+                  กำลังโหลดบัญชี...
+                </div>
+              ) : safeAccounts.length === 0 ? (
+                <div className="w-full px-4 py-3 border border-gray-200 dark:border-gray-600 rounded-xl bg-gray-50 dark:bg-gray-700 text-gray-500 dark:text-gray-400">
+                  ไม่พบบัญชี กรุณาเพิ่มบัญชีก่อนทำรายการ
+                </div>
+              ) : (
+                <select
+                  value={selectedAccountId || ''}
+                  onChange={(e) => setSelectedAccountId(e.target.value || null)}
+                  className="w-full px-4 py-3 border border-gray-200 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                >
+                  <option value="">เลือกบัญชีที่ต้องการทำรายการ</option>
+                  {safeAccounts.map((account) => (
+                    <option key={account.id} value={account.id}>
+                      {account.name} (฿{account.current_balance.toLocaleString()})
+                    </option>
+                  ))}
+                </select>
+              )}
             </div>
 
             {/* Category Selector */}
@@ -235,9 +335,9 @@ export default function AddTransactionPage() {
             {/* Submit Button */}
             <button
               onClick={handleSubmit}
-              disabled={isSubmitting}
+              disabled={isSubmitting || accountsLoading || safeAccounts.length === 0}
               className={`w-full py-3 rounded-xl font-medium transition-all ${
-                isSubmitting
+                isSubmitting || accountsLoading || safeAccounts.length === 0
                   ? 'bg-gray-300 dark:bg-gray-600 text-gray-500 dark:text-gray-400 cursor-not-allowed'
                   : activeTab === 'expense'
                   ? 'bg-red-500 hover:bg-red-600 text-white shadow-md hover:shadow-lg'
@@ -251,6 +351,14 @@ export default function AddTransactionPage() {
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                   </svg>
                   กำลังบันทึก...
+                </span>
+              ) : accountsLoading ? (
+                <span className="flex items-center justify-center">
+                  <svg className="animate-spin -ml-1 mr-3 h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  กำลังโหลด...
                 </span>
               ) : (
                 `บันทึก${activeTab === 'expense' ? 'รายจ่าย' : 'รายรับ'}`
@@ -266,10 +374,10 @@ export default function AddTransactionPage() {
                 <h3 className="text-sm font-medium opacity-90 mb-2">บัญชีที่เลือก</h3>
                 <div className="space-y-2">
                   <p className="font-semibold text-lg">{selectedAccount.name}</p>
-                  <p className="text-sm opacity-90">{selectedAccount.bank}</p>
+                  <p className="text-sm opacity-90">{selectedAccount.bank_name || 'ไม่ระบุธนาคาร'}</p>
                   <div className="pt-3 border-t border-white/20">
                     <p className="text-xs opacity-75 mb-1">ยอดคงเหลือ</p>
-                    <p className="text-2xl font-bold">฿{selectedAccount.balance.toLocaleString()}</p>
+                    <p className="text-2xl font-bold">฿{selectedAccount.current_balance.toLocaleString()}</p>
                   </div>
                 </div>
               </div>
@@ -302,7 +410,7 @@ export default function AddTransactionPage() {
                     <div className="pt-3 border-t border-white/20">
                       <p className="text-xs opacity-75 mb-1">ยอดคงเหลือหลังหัก</p>
                       <p className="text-xl font-bold">
-                        ฿{(selectedAccount.balance - parseFloat(amount)).toLocaleString()}
+                        ฿{(selectedAccount.current_balance - parseFloat(amount)).toLocaleString()}
                       </p>
                     </div>
                   )}

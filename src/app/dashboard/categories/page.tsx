@@ -3,8 +3,9 @@
 import React, { useState, useEffect } from 'react';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import { useCategories, Category } from '@/contexts/CategoryContext';
-import { useTypes, Type } from '@/contexts/TypeContext';
+import { TRANSACTION_TYPES } from '@/constants/types';
 import { apiClient } from '@/utils/apiClient';
+import { toast } from '@/utils/toast';
 
 const CategoriesPage: React.FC = () => {
   const {
@@ -17,10 +18,14 @@ const CategoriesPage: React.FC = () => {
     deleteCategory,
   } = useCategories();
 
-  const {
-    types,
-    isLoading: isLoadingTypes,
-  } = useTypes();
+  // Available transaction types (constant)
+  const transactionTypes = [TRANSACTION_TYPES.INCOME, TRANSACTION_TYPES.EXPENSE];
+
+  // Helper function to get type info from type_id
+  const getTypeInfo = (typeId: string | undefined) => {
+    if (!typeId) return null;
+    return transactionTypes.find(t => t.id === typeId);
+  };
 
   const [showModal, setShowModal] = useState(false);
   const [modalType, setModalType] = useState<'income' | 'expense'>('income');
@@ -84,7 +89,7 @@ const CategoriesPage: React.FC = () => {
 
   const handleSaveCategory = async () => {
     if (!categoryForm.name.trim()) {
-      alert('กรุณากรอกชื่อหมวดหมู่');
+      toast.warning('ข้อมูลไม่ครบถ้วน', 'กรุณากรอกชื่อหมวดหมู่');
       return;
     }
 
@@ -93,8 +98,10 @@ const CategoriesPage: React.FC = () => {
     try {
       if (editingCategory) {
         await updateCategory(modalType, editingCategory.id, categoryForm);
+        toast.success('แก้ไขหมวดหมู่สำเร็จ', `แก้ไขหมวดหมู่ "${categoryForm.name}" เรียบร้อยแล้ว`);
       } else {
         await addCategory(modalType, categoryForm);
+        toast.success('เพิ่มหมวดหมู่สำเร็จ', `เพิ่มหมวดหมู่ "${categoryForm.name}" เรียบร้อยแล้ว`);
       }
 
       setShowModal(false);
@@ -110,7 +117,7 @@ const CategoriesPage: React.FC = () => {
       setTimeout(() => setShowSuccessMessage(false), 3000);
     } catch (error) {
       console.error('Failed to save category:', error);
-      alert(error instanceof Error ? error.message : 'ไม่สามารถบันทึกหมวดหมู่ได้');
+      toast.error('เกิดข้อผิดพลาด', error instanceof Error ? error.message : 'ไม่สามารถบันทึกหมวดหมู่ได้');
     } finally {
       setIsSaving(false);
     }
@@ -127,11 +134,12 @@ const CategoriesPage: React.FC = () => {
     setIsSaving(true);
     try {
       await deleteCategory(type, categoryId);
+      toast.success('ลบหมวดหมู่สำเร็จ', `ลบหมวดหมู่ "${category.name}" เรียบร้อยแล้ว`);
       setShowSuccessMessage(true);
       setTimeout(() => setShowSuccessMessage(false), 3000);
     } catch (error) {
       console.error('Failed to delete category:', error);
-      alert(error instanceof Error ? error.message : 'ไม่สามารถลบหมวดหมู่ได้');
+      toast.error('เกิดข้อผิดพลาด', error instanceof Error ? error.message : 'ไม่สามารถลบหมวดหมู่ได้');
     } finally {
       setIsSaving(false);
     }
@@ -272,8 +280,8 @@ const CategoriesPage: React.FC = () => {
                           </p>
                           {category.type_id && (
                             <p className="text-xs text-gray-500 dark:text-gray-400">
-                              {types.find(t => String(t.id) === String(category.type_id))?.icon}{' '}
-                              {category.type_name || types.find(t => String(t.id) === String(category.type_id))?.name}
+                              {getTypeInfo(category.type_id)?.icon}{' '}
+                              {getTypeInfo(category.type_id)?.name}
                             </p>
                           )}
                         </div>
@@ -345,8 +353,8 @@ const CategoriesPage: React.FC = () => {
                           </p>
                           {category.type_id && (
                             <p className="text-xs text-gray-500 dark:text-gray-400">
-                              {types.find(t => String(t.id) === String(category.type_id))?.icon}{' '}
-                              {category.type_name || types.find(t => String(t.id) === String(category.type_id))?.name}
+                              {getTypeInfo(category.type_id)?.icon}{' '}
+                              {getTypeInfo(category.type_id)?.name}
                             </p>
                           )}
                         </div>
@@ -452,16 +460,14 @@ const CategoriesPage: React.FC = () => {
                         className="w-full px-4 py-3 border border-gray-200 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 dark:bg-gray-700 dark:text-white"
                       >
                         <option value="">ไม่ระบุประเภท</option>
-                        {types
-                          .filter(t => t.is_active)
-                          .map((type) => (
-                            <option key={type.id} value={type.id}>
-                              {type.icon} {type.name}
-                            </option>
-                          ))}
+                        {transactionTypes.map((type) => (
+                          <option key={type.id} value={type.id}>
+                            {type.icon} {type.name}
+                          </option>
+                        ))}
                       </select>
                       <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                        เลือกประเภทเพื่อจัดกลุ่มหมวดหมู่ (ไม่บังคับ)
+                        เลือกประเภทเพื่อจัดกลุ่มหมวดหมู่ (เลือก รายรับ หรือ รายจ่าย)
                       </p>
                     </div>
 
@@ -535,8 +541,8 @@ const CategoriesPage: React.FC = () => {
                           </p>
                           {categoryForm.type_id && (
                             <p className="text-xs text-gray-500 dark:text-gray-400">
-                              {types.find(t => String(t.id) === String(categoryForm.type_id))?.icon}{' '}
-                              {types.find(t => String(t.id) === String(categoryForm.type_id))?.name}
+                              {getTypeInfo(categoryForm.type_id)?.icon}{' '}
+                              {getTypeInfo(categoryForm.type_id)?.name}
                             </p>
                           )}
                         </div>

@@ -8,6 +8,8 @@ import GoogleButton from "@/components/auth/GoogleButton";
 import InputField from "@/components/auth/InputField";
 import PrimaryButton from "@/components/auth/PrimaryButton";
 import { saveAuthData } from "@/utils/authStorage";
+import { authApi } from "@/utils/apiClient";
+import { useUser } from "@/contexts/UserContext";
 
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/api/v1";
@@ -15,6 +17,7 @@ const API_BASE_URL =
 function LoginContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { refreshUser } = useUser();
   const [formData, setFormData] = useState({
     email: "",
     password: "",
@@ -22,9 +25,23 @@ function LoginContent() {
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [successMessage, setSuccessMessage] = useState("");
+  const [sessionExpiredMessage, setSessionExpiredMessage] = useState("");
 
   const googleCode = searchParams?.get("code");
   const googleState = searchParams?.get("state");
+
+  // Check for session expired message on component mount
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const message = sessionStorage.getItem("auth_message");
+      if (message) {
+        setSessionExpiredMessage(message);
+        sessionStorage.removeItem("auth_message");
+        // Auto-clear message after 5 seconds
+        setTimeout(() => setSessionExpiredMessage(""), 5000);
+      }
+    }
+  }, []);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -46,12 +63,7 @@ function LoginContent() {
   const handleGoogleLogin = async () => {
     setLoading(true);
     try {
-      const response = await fetch(`${API_BASE_URL}/auth/google/login`);
-      if (!response.ok) {
-        throw new Error("ไม่สามารถเชื่อมต่อ Google OAuth ได้");
-      }
-
-      const data = await response.json().catch(() => null);
+      const data = await authApi.getGoogleLoginUrl() as any;
 
       if (data?.url) {
         window.location.href = data.url;
@@ -97,23 +109,9 @@ function LoginContent() {
         password: formData.password,
       };
 
-      const response = await fetch(`${API_BASE_URL}/auth/login`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(payload),
-      });
+      const authData = await authApi.login(payload) as any;
 
-      const result = await response.json().catch(() => null);
-      if (!response.ok) {
-        const errorMessage =
-          result?.message || result?.error || "เกิดข้อผิดพลาดในการเข้าสู่ระบบ";
-        setErrors({ general: errorMessage });
-        return;
-      }
-
-      const authData = result?.data;
+      // API client already unwraps the response, so authData is the actual data
       if (!authData?.accessToken || !authData?.refreshToken || !authData?.user) {
         setErrors({
           general: "ข้อมูลการเข้าสู่ระบบไม่ครบถ้วน กรุณาลองใหม่อีกครั้ง",
@@ -128,8 +126,12 @@ function LoginContent() {
         user: authData.user,
       });
 
-      setSuccessMessage(result?.message || "เข้าสู่ระบบสำเร็จ");
+      setSuccessMessage("เข้าสู่ระบบสำเร็จ");
       setFormData({ email: "", password: "" });
+      
+      // Refresh user data from /me endpoint
+      await refreshUser();
+      
       setTimeout(() => {
         router.push("/dashboard");
       }, 400);
@@ -172,6 +174,7 @@ function LoginContent() {
           return;
         }
 
+        // For Google callback, data is in result.data
         const authData = result?.data;
         if (
           !authData?.accessToken ||
@@ -190,6 +193,9 @@ function LoginContent() {
           expiresAt: authData.expiresAt,
           user: authData.user,
         });
+
+        // Refresh user data from /me endpoint
+        await refreshUser();
 
         if (!isCancelled) {
           router.replace("/dashboard");
@@ -246,6 +252,15 @@ function LoginContent() {
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
+          {sessionExpiredMessage && (
+            <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-3 flex items-center space-x-2">
+              <svg className="w-5 h-5 text-yellow-600 dark:text-yellow-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <p className="text-sm text-yellow-700 dark:text-yellow-300">{sessionExpiredMessage}</p>
+            </div>
+          )}
+
           {errors.general && (
             <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3">
               <p className="text-sm text-red-600 dark:text-red-400">{errors.general}</p>

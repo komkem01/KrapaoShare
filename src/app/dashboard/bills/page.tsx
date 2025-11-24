@@ -1,8 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import DashboardLayout from '@/components/layout/DashboardLayout';
+import { useBill, Bill as ApiBill, BillParticipant } from '@/contexts/BillContext';
+import { toast } from 'sonner';
 
 interface BillMember {
   name: string;
@@ -33,6 +35,20 @@ interface EditingBill {
 
 export default function BillsPage() {
   const router = useRouter();
+  const {
+    bills,
+    participants,
+    loading,
+    error,
+    fetchBills,
+    createBill,
+    updateBill,
+    deleteBill,
+    addParticipant,
+    updateParticipant,
+    fetchParticipants,
+  } = useBill();
+
   const [activeTab, setActiveTab] = useState<'active' | 'settled'>('active');  
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -48,136 +64,150 @@ export default function BillsPage() {
   });
 
   const itemsPerPage = 4;
+  
+  // Load bills on mount
+  useEffect(() => {
+    fetchBills();
+  }, [fetchBills]);
 
-  // Mock data - ในอนาคตจะเชื่อมกับ API
-  const [mockActiveBills, setMockActiveBills] = useState([
-    {
-      id: 1,
-      title: 'ค่าอาหารเที่ยงที่ MK',
-      totalAmount: 1250,
-      description: 'สุกี้ + เครื่องดื่ม',
-      createdBy: 'คุณ',
-      createdAt: '2025-11-14',
-      members: [
-        { name: 'คุณ', amount: 312.50, paid: false },
-        { name: 'มิกิ', amount: 312.50, paid: true },
-        { name: 'โยชิ', amount: 312.50, paid: false },
-        { name: 'แอน', amount: 312.50, paid: false }
-      ],
-      status: 'active' as const
-    },
-    {
-      id: 2,
-      title: 'ค่าแท็กซี่กลับบ้าน',
-      totalAmount: 280,
-      description: 'จากสยามไปบางนา',
-      createdBy: 'มิกิ',
-      createdAt: '2025-11-13',
-      members: [
-        { name: 'คุณ', amount: 93.33, paid: false },
-        { name: 'มิกิ', amount: 93.33, paid: true },
-        { name: 'โยชิ', amount: 93.34, paid: false }
-      ],
-      status: 'active' as const
-    },
-    {
-      id: 3,
-      title: 'ซื้อของใช้ในหอ',
-      totalAmount: 450,
-      description: 'ผงซักฟอก + น้ำยาล้างจาน',
-      createdBy: 'คุณ',
-      createdAt: '2025-11-12',
-      members: [
-        { name: 'คุณ', amount: 150, paid: true },
-        { name: 'มิกิ', amount: 150, paid: false },
-        { name: 'โยชิ', amount: 150, paid: false }
-      ],
-      status: 'active' as const
-    }
-  ]);
+  // Transform API data to match UI format
+  interface UIBillMember {
+    name: string;
+    amount: number;
+    paid: boolean;
+    participantId?: string;
+  }
 
-  const [mockSettledBills, setMockSettledBills] = useState([
-    {
-      id: 4,
-      title: 'ค่าหนังที่ SF',
-      totalAmount: 680,
-      description: 'Fast & Furious 11',
-      createdBy: 'แอน',
-      createdAt: '2025-11-10',
-      settledAt: '2025-11-11',
-      members: [
-        { name: 'คุณ', amount: 170, paid: true },
-        { name: 'มิกิ', amount: 170, paid: true },
-        { name: 'โยชิ', amount: 170, paid: true },
-        { name: 'แอน', amount: 170, paid: true }
-      ],
-      status: 'settled' as const
-    }
-  ]);
+  interface UIBill {
+    id: number;
+    title: string;
+    totalAmount: number;
+    description: string;
+    createdBy: string;
+    createdAt: string;
+    members: UIBillMember[];
+    status: 'active' | 'settled';
+    settledAt?: string;
+  }
 
-  const filteredBills = activeTab === 'active' ? mockActiveBills : mockSettledBills;
+  const transformBillsToUI = (apiBills: ApiBill[], apiParticipants: BillParticipant[]): UIBill[] => {
+    return apiBills.map(bill => {
+      const billParticipants = apiParticipants.filter(p => p.bill_id === bill.id);
+      
+      return {
+        id: parseInt(bill.id),
+        title: bill.title,
+        totalAmount: bill.total_amount,
+        description: bill.description || '',
+        createdBy: 'คุณ', // Since it's user's bill
+        createdAt: bill.created_at.split('T')[0],
+        members: billParticipants.map(p => ({
+          name: p.user_name || p.user_email || 'สมาชิก',
+          amount: p.amount,
+          paid: p.is_paid,
+          participantId: p.id,
+        })),
+        status: bill.status === 'settled' ? 'settled' : 'active',
+        settledAt: bill.settled_at?.split('T')[0],
+      };
+    });
+  };
+
+  const uiBills = transformBillsToUI(bills, participants);
+  const activeBills = uiBills.filter(bill => bill.status === 'active');
+  const settledBills = uiBills.filter(bill => bill.status === 'settled');
+
+  // TODO: ✅ Backend API Ready!
+  // Backend now has /bills and /bill-participants endpoints - integrate with real API:
+  //   GET    /bills                           - List bills
+  //   POST   /bills                           - Create bill
+  //   GET    /bills/:id                       - Get bill details
+  //   PATCH  /bills/:id                       - Update bill
+  //   DELETE /bills/:id                       - Delete bill
+  //   GET    /bill-participants               - List participants
+  //   POST   /bill-participants               - Add participant
+  //   GET    /bill-participants/bill/:billId  - Get bill participants
+  //   GET    /bill-participants/user/:userId  - Get user's bills
+  //   PATCH  /bill-participants/:id           - Update participant (mark paid)
+  //
+  // See src/utils/apiClient.ts for implementation
+
+  const filteredBills = activeTab === 'active' ? activeBills : settledBills;
   
   // Pagination logic
   const totalPages = Math.ceil(filteredBills.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
   const paginatedBills = filteredBills.slice(startIndex, startIndex + itemsPerPage);
 
-  const handleCreateBill = () => {
+  const handleCreateBill = async () => {
     if (!newBill.title || !newBill.totalAmount || newBill.members.filter(m => m.trim()).length === 0) {
-      alert('กรุณากรอกข้อมูลให้ครบถ้วน');
+      toast.info('กรุณากรอกข้อมูลให้ครบถ้วน');
       return;
     }
 
     const validMembers = newBill.members.filter(m => m.trim());
     const totalAmount = parseFloat(newBill.totalAmount);
 
-    let newMembers: BillMember[];
+    try {
+      // Create the bill first
+      const createdBill = await createBill({
+        title: newBill.title,
+        total_amount: totalAmount,
+        description: newBill.description,
+        bill_date: new Date().toISOString(),
+        user_id: '', // Will be set by context
+      });
 
-    if (newBill.splitType === 'equal') {
-      // หารเท่าๆ กัน
-      const amountPerPerson = totalAmount / (validMembers.length + 1); // +1 for "คุณ"
-      newMembers = [
-        { name: 'คุณ', amount: amountPerPerson, paid: true },
-        ...validMembers.map(member => ({ name: member, amount: amountPerPerson, paid: false }))
-      ];
-    } else {
-      // กำหนดจำนวนเองแต่ละคน
-      const memberAmountsSum = Object.values(newBill.memberAmounts).reduce((sum, amount) => sum + amount, 0);
-      if (Math.abs(memberAmountsSum - totalAmount) > 0.01) {
-        alert(`ยอดรวมไม่ตรงกัน! ยอดที่กรอก: ฿${memberAmountsSum.toLocaleString()} ยอดรวมที่ระบุ: ฿${totalAmount.toLocaleString()}`);
-        return;
+      // Then add participants
+      if (newBill.splitType === 'equal') {
+        // Equal split
+        const amountPerPerson = totalAmount / (validMembers.length + 1); // +1 for current user
+        
+        // Add participants for each member
+        for (const member of validMembers) {
+          await addParticipant({
+            bill_id: createdBill.id,
+            user_id: member, // In a real app, this would be the user ID
+            amount: amountPerPerson,
+          });
+        }
+      } else {
+        // Custom split
+        const memberAmountsSum = Object.values(newBill.memberAmounts).reduce((sum, amount) => sum + amount, 0);
+        if (Math.abs(memberAmountsSum - totalAmount) > 0.01) {
+          toast.info(`ยอดรวมไม่ตรงกัน! ยอดที่กรอก: ฿${memberAmountsSum.toLocaleString()} ยอดรวมที่ระบุ: ฿${totalAmount.toLocaleString()}`);
+          return;
+        }
+
+        // Add participants with custom amounts
+        for (const [memberName, amount] of Object.entries(newBill.memberAmounts)) {
+          if (memberName !== 'คุณ') { // Skip current user
+            await addParticipant({
+              bill_id: createdBill.id,
+              user_id: memberName, // In a real app, this would be the user ID
+              amount: amount,
+            });
+          }
+        }
       }
 
-      newMembers = Object.entries(newBill.memberAmounts).map(([name, amount]) => ({
-        name,
-        amount,
-        paid: name === 'คุณ'
-      }));
+      // Refresh data
+      await fetchBills();
+      await fetchParticipants();
+
+      setShowCreateModal(false);
+      setNewBill({
+        title: '',
+        totalAmount: '',
+        description: '',
+        members: [''],
+        splitType: 'equal',
+        memberAmounts: {}
+      });
+      setCurrentPage(1);
+    } catch (err) {
+      toast.info('ไม่สามารถสร้างบิลได้: ' + (err as Error).message);
     }
-
-    const newId = Math.max(...[...mockActiveBills, ...mockSettledBills].map(bill => bill.id)) + 1;
-    const newBillData = {
-      id: newId,
-      title: newBill.title,
-      totalAmount: totalAmount,
-      description: newBill.description,
-      createdBy: 'คุณ',
-      createdAt: new Date().toISOString().split('T')[0],
-      members: newMembers,
-      status: 'active' as const
-    };
-
-    setMockActiveBills(prev => [newBillData, ...prev]);
-    setShowCreateModal(false);
-    setNewBill({
-      title: '',
-      totalAmount: '',
-      description: '',
-      members: [''],
-      splitType: 'equal',
-      memberAmounts: {}
-    });
-    setCurrentPage(1);
   };
 
   const addMemberField = () => {
@@ -243,40 +273,39 @@ export default function BillsPage() {
     }));
   };
 
-  const handlePayment = (billId: number, memberName: string) => {
-    setMockActiveBills(prev => prev.map(bill => 
-      bill.id === billId 
-        ? {
-            ...bill,
-            members: bill.members.map(member => 
-              member.name === memberName 
-                ? { ...member, paid: true }
-                : member
-            )
-          }
-        : bill
-    ));
-    
-    // Check if all members paid - if so, move to settled
-    const updatedBill = mockActiveBills.find(bill => bill.id === billId);
-    if (updatedBill) {
-      const allPaid = updatedBill.members.every(member => 
-        member.name === memberName ? true : member.paid
-      );
+  const handlePayment = async (billId: number, memberName: string) => {
+    try {
+      // Find the participant to update
+      const bill = uiBills.find(b => b.id === billId);
+      if (!bill) return;
       
+      const member = bill.members.find(m => m.name === memberName);
+      if (!member?.participantId) return;
+
+      // Update participant payment status
+      await updateParticipant(member.participantId, {
+        is_paid: true,
+        paid_at: new Date().toISOString(),
+      });
+
+      // Check if all participants are paid
+      const allPaid = bill.members.every(m => 
+        m.name === memberName ? true : m.paid
+      );
+
       if (allPaid) {
-        setMockActiveBills(prev => prev.filter(bill => bill.id !== billId));
-        setMockSettledBills(prev => [...prev, {
-          ...updatedBill,
-          status: 'settled' as const,
-          settledAt: new Date().toISOString().split('T')[0],
-          members: updatedBill.members.map(member => 
-            member.name === memberName 
-              ? { ...member, paid: true }
-              : member
-          )
-        }]);
+        // Update bill status to settled
+        await updateBill(billId.toString(), {
+          status: 'settled',
+          settled_at: new Date().toISOString(),
+        });
       }
+
+      // Refresh data
+      await fetchBills();
+      await fetchParticipants();
+    } catch (err) {
+      toast.info('ไม่สามารถอัปเดตการจ่ายเงินได้: ' + (err as Error).message);
     }
   };
 
@@ -293,40 +322,32 @@ export default function BillsPage() {
   };
 
   const handleReminder = (billId: number) => {
-    alert(`แจ้งเตือนเพื่อนสำหรับบิล ID: ${billId}`);
+    toast.info(`แจ้งเตือนเพื่อนสำหรับบิล ID: ${billId}`);
   };
 
-  const handleUpdateBill = () => {
+  const handleUpdateBill = async () => {
     if (!editingBill || !editingBill.title || !editingBill.totalAmount) {
-      alert('กรุณากรอกข้อมูลให้ครบถ้วน');
+      toast.info('กรุณากรอกข้อมูลให้ครบถ้วน');
       return;
     }
 
-    const validMembers = editingBill.members.filter((m: string) => m.trim());
-    const totalAmount = parseFloat(editingBill.totalAmount);
-    const amountPerPerson = totalAmount / (validMembers.length + 1);
+    try {
+      // Update the bill
+      await updateBill(editingBill.id.toString(), {
+        title: editingBill.title,
+        total_amount: parseFloat(editingBill.totalAmount),
+        description: editingBill.description,
+      });
 
-    setMockActiveBills(prev => prev.map(bill => 
-      bill.id === editingBill.id
-        ? {
-            ...bill,
-            title: editingBill.title,
-            totalAmount: totalAmount,
-            description: editingBill.description,
-            members: [
-              { name: 'คุณ', amount: amountPerPerson, paid: true },
-              ...validMembers.map((member: string) => ({ 
-                name: member, 
-                amount: amountPerPerson, 
-                paid: bill.members.find(m => m.name === member)?.paid || false 
-              }))
-            ]
-          }
-        : bill
-    ));
+      // Refresh data
+      await fetchBills();
+      await fetchParticipants();
 
-    setShowEditModal(false);
-    setEditingBill(null);
+      setShowEditModal(false);
+      setEditingBill(null);
+    } catch (err) {
+      toast.info('ไม่สามารถอัปเดตบิลได้: ' + (err as Error).message);
+    }
   };
 
   return (
@@ -362,7 +383,7 @@ export default function BillsPage() {
                   บิลที่ยังไม่จ่าย
                 </p>
                 <p className="text-2xl font-semibold text-orange-600 dark:text-orange-400">
-                  {mockActiveBills.length}
+                  {activeBills.length}
                 </p>
               </div>
             </div>
@@ -378,7 +399,7 @@ export default function BillsPage() {
                   ที่ต้องจ่าย
                 </p>
                 <p className="text-2xl font-semibold text-red-600 dark:text-red-400">
-                  ฿{mockActiveBills.reduce((sum, bill) => 
+                  ฿{activeBills.reduce((sum, bill) => 
                     sum + (bill.members.find(m => m.name === 'คุณ' && !m.paid)?.amount || 0), 0
                   ).toLocaleString()}
                 </p>
@@ -396,7 +417,7 @@ export default function BillsPage() {
                   ที่ต้องได้รับ
                 </p>
                 <p className="text-2xl font-semibold text-green-600 dark:text-green-400">
-                  ฿{mockActiveBills.reduce((sum, bill) => 
+                  ฿{activeBills.reduce((sum, bill) => 
                     bill.createdBy === 'คุณ' ? sum + bill.members.filter(m => m.name !== 'คุณ' && !m.paid).reduce((s, m) => s + m.amount, 0) : sum, 0
                   ).toLocaleString()}
                 </p>
@@ -419,7 +440,7 @@ export default function BillsPage() {
                   : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300'
               }`}
             >
-              บิลที่ยังไม่จ่าย ({mockActiveBills.length})
+              บิลที่ยังไม่จ่าย ({activeBills.length})
             </button>
             <button
               onClick={() => {
@@ -432,14 +453,29 @@ export default function BillsPage() {
                   : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300'
               }`}
             >
-              บิลที่จ่ายแล้ว ({mockSettledBills.length})
+              บิลที่จ่ายแล้ว ({settledBills.length})
             </button>
           </nav>
         </div>
 
-        {/* Bills List */}
-        <div className="grid gap-6">
-          {paginatedBills.length > 0 ? (
+        {/* Error Message */}
+        {error && (
+          <div className="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-700 text-red-700 dark:text-red-300 px-4 py-3 rounded-xl">
+            {error}
+          </div>
+        )}
+
+        {/* Loading State */}
+        {loading ? (
+          <div className="text-center py-12">
+            <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 dark:border-white"></div>
+            <p className="mt-4 text-gray-500 dark:text-gray-400">กำลังโหลดบิล...</p>
+          </div>
+        ) : (
+          <>
+            {/* Bills List */}
+            <div className="grid gap-6">
+              {paginatedBills.length > 0 ? (
             paginatedBills.map((bill) => (
             <div key={bill.id} className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
               <div className="flex justify-between items-start mb-4">
@@ -457,7 +493,7 @@ export default function BillsPage() {
                     {bill.status === 'settled' && 'settledAt' in bill && (
                       <>
                         <span>•</span>
-                        <span>จ่ายแล้ว {new Date(bill.settledAt).toLocaleDateString('th-TH')}</span>
+                        <span>จ่ายแล้ว {bill.settledAt ? new Date(bill.settledAt).toLocaleDateString('th-TH') : ''}</span>
                       </>
                     )}
                   </div>
@@ -557,44 +593,46 @@ export default function BillsPage() {
           )}
         </div>
 
-        {/* Pagination */}
-        {totalPages > 1 && (
-          <div className="flex items-center justify-between bg-white dark:bg-gray-800 px-6 py-4 rounded-lg border border-gray-200 dark:border-gray-700">
-            <div className="text-sm text-gray-500 dark:text-gray-400">
-              แสดง {startIndex + 1}-{Math.min(startIndex + itemsPerPage, filteredBills.length)} จาก {filteredBills.length} รายการ
-            </div>
-            <div className="flex space-x-2">
-              <button
-                onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                disabled={currentPage === 1}
-                className="px-3 py-1 rounded border border-gray-300 dark:border-gray-600 text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300"
-              >
-                ก่อนหน้า
-              </button>
-              
-              {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-                <button
-                  key={page}
-                  onClick={() => setCurrentPage(page)}
-                  className={`px-3 py-1 rounded text-sm ${
-                    currentPage === page
-                      ? 'bg-gray-900 dark:bg-white text-white dark:text-gray-900'
-                      : 'border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300'
-                  }`}
-                >
-                  {page}
-                </button>
-              ))}
-              
-              <button
-                onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-                disabled={currentPage === totalPages}
-                className="px-3 py-1 rounded border border-gray-300 dark:border-gray-600 text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300"
-              >
-                ถัดไป
-              </button>
-            </div>
-          </div>
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between bg-white dark:bg-gray-800 px-6 py-4 rounded-lg border border-gray-200 dark:border-gray-700">
+                <div className="text-sm text-gray-500 dark:text-gray-400">
+                  แสดง {startIndex + 1}-{Math.min(startIndex + itemsPerPage, filteredBills.length)} จาก {filteredBills.length} รายการ
+                </div>
+                <div className="flex space-x-2">
+                  <button
+                    onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                    disabled={currentPage === 1}
+                    className="px-3 py-1 rounded border border-gray-300 dark:border-gray-600 text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300"
+                  >
+                    ก่อนหน้า
+                  </button>
+                  
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                    <button
+                      key={page}
+                      onClick={() => setCurrentPage(page)}
+                      className={`px-3 py-1 rounded text-sm ${
+                        currentPage === page
+                          ? 'bg-gray-900 dark:bg-white text-white dark:text-gray-900'
+                          : 'border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300'
+                      }`}
+                    >
+                      {page}
+                    </button>
+                  ))}
+                  
+                  <button
+                    onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                    disabled={currentPage === totalPages}
+                    className="px-3 py-1 rounded border border-gray-300 dark:border-gray-600 text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300"
+                  >
+                    ถัดไป
+                  </button>
+                </div>
+              </div>
+            )}
+          </>
         )}
 
         {/* Create Bill Modal */}

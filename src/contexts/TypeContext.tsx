@@ -46,6 +46,7 @@ interface TypeContextType {
   refreshTypes: () => Promise<void>;
   addType: (data: TypeFormData) => Promise<void>;
   updateType: (id: string | number, data: TypeFormData) => Promise<void>;
+  updateTypeStatus: (id: string | number, isActive: boolean) => Promise<void>;
   deleteType: (id: string | number) => Promise<void>;
 }
 
@@ -212,21 +213,55 @@ export const TypeProvider: React.FC<TypeProviderProps> = ({ children }) => {
         isActive: data.is_active ?? true,
       };
       
-      console.log('Updating type with payload:', payload);
+      console.log('🔄 Updating type with payload:', payload);
       
       const response = await apiClient.patch<TypeApiResponse>(`/types/${id}`, payload);
       
+      console.log('✅ Update response from backend:', response);
+      console.log('✅ Normalized response:', normalizeType(response));
+      
       if (response) {
         const normalizedType = normalizeType(response);
-        setTypes(prev => 
-          prev.map(type => 
+        setTypes(prev => {
+          const updated = prev.map(type => 
             String(type.id) === String(id) ? normalizedType : type
-          )
-        );
+          );
+          console.log('✅ Updated types state:', updated.map(t => ({ id: t.id, name: t.name, is_active: t.is_active })));
+          return updated;
+        });
       }
     } catch (err) {
-      console.error('Failed to update type:', err);
+      console.error('❌ Failed to update type:', err);
       throw new Error('ไม่สามารถอัปเดตประเภทได้');
+    }
+  };
+
+  const updateTypeStatus = async (id: string | number, isActive: boolean) => {
+    try {
+      const payload = {
+        isActive: isActive,
+      };
+      
+      console.log('🔄 Updating type status with payload:', payload);
+      
+      const response = await apiClient.patch<TypeApiResponse>(`/types/${id}/status`, payload);
+      
+      console.log('✅ Update status response from backend:', response);
+      console.log('✅ Normalized response:', normalizeType(response));
+      
+      if (response) {
+        const normalizedType = normalizeType(response);
+        setTypes(prev => {
+          const updated = prev.map(type => 
+            String(type.id) === String(id) ? normalizedType : type
+          );
+          console.log('✅ Updated types state after status change:', updated.map(t => ({ id: t.id, name: t.name, is_active: t.is_active })));
+          return updated;
+        });
+      }
+    } catch (err) {
+      console.error('❌ Failed to update type status:', err);
+      throw new Error('ไม่สามารถอัปเดตสถานะประเภทได้');
     }
   };
 
@@ -261,6 +296,7 @@ export const TypeProvider: React.FC<TypeProviderProps> = ({ children }) => {
     refreshTypes: forceRefresh,
     addType,
     updateType,
+    updateTypeStatus,
     deleteType,
   };
 
