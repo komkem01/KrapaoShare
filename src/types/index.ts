@@ -93,6 +93,34 @@ export interface SavingsGoal {
   updated_at: string;
 }
 
+// Goal Deposit types (Personal Goals)
+export interface GoalDeposit {
+  id: string;
+  goalId: string;
+  userId: string;
+  transactionId: string;
+  fromAccountId: string;
+  amount: number;
+  depositDate: string;
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateGoalDepositForm {
+  goalId: string;
+  userId: string;
+  fromAccountId: string;
+  amount: number;
+  notes?: string;
+}
+
+export interface UpdateGoalDepositForm {
+  amount?: number;
+  depositDate?: string;
+  notes?: string;
+}
+
 // Shared Goal types
 export interface SharedGoalMember {
   user_id: string;

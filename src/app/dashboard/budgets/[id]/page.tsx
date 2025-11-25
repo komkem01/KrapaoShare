@@ -3,87 +3,45 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import DashboardLayout from '@/components/layout/DashboardLayout';
+import { useBudget } from '@/contexts/BudgetContext';
+import { useUser } from '@/contexts/UserContext';
 import { toast } from 'sonner';
+import { budgetApi, transactionApi, accountApi } from '@/utils/apiClient';
 
 // Types
 interface Transaction {
-  id?: number;
+  id?: string;
   date: string;
   amount: number;
   description: string;
+  categoryId?: string;
   category?: string;
+  budgetId?: string;
+  transactionDate?: string;
+  userId?: string;
+  accountId?: string;
+  type?: string;
 }
 
 interface Budget {
-  id: number;
+  id: string | number;
   category: string;
+  categoryId?: string;
   budgetAmount: number;
   spentAmount: number;
   month: string;
-  description: string;
+  description?: string;
+  name?: string;
+  periodStart?: string;
+  periodEnd?: string;
+  periodType?: string;
+  budgetMonth?: number;
+  budgetYear?: number;
+  alertPercentage?: number;
+  isActive?: boolean;
+  autoRollover?: boolean;
   transactions: Transaction[];
 }
-
-// Mock data
-const mockBudgets: Budget[] = [
-  {
-    id: 1,
-    category: 'อาหาร',
-    budgetAmount: 6000,
-    spentAmount: 2350,
-    month: '2025-11',
-    description: 'ค่าอาหารรายเดือน',
-    transactions: [
-      { id: 1, date: '2025-11-14', amount: 350, description: 'ข้าวผัดกะเพรา + น้ำ', category: 'อาหาร' },
-      { id: 2, date: '2025-11-13', amount: 250, description: 'ก๋วยเตี๋ยว + กาแฟ', category: 'อาหาร' },
-      { id: 3, date: '2025-11-12', amount: 180, description: 'ข้าวมันไก่', category: 'อาหาร' },
-      { id: 4, date: '2025-11-11', amount: 420, description: 'ชาบู + เครื่องดื่ม (4 คน)', category: 'อาหาร' },
-      { id: 5, date: '2025-11-10', amount: 85, description: 'กาแฟเช้า', category: 'อาหาร' },
-      { id: 6, date: '2025-11-09', amount: 290, description: 'ข้าวแกงกับเพื่อน', category: 'อาหาร' },
-      { id: 7, date: '2025-11-08', amount: 150, description: 'ข้าวเหนียวมะม่วง', category: 'อาหาร' },
-      { id: 8, date: '2025-11-07', amount: 625, description: 'บุฟเฟ่ต์ BBQ', category: 'อาหาร' }
-    ]
-  },
-  {
-    id: 2,
-    category: 'ค่าเดินทาง',
-    budgetAmount: 1500,
-    spentAmount: 1200,
-    month: '2025-11',
-    description: 'รถเมล์ แท็กซี่ Grab',
-    transactions: [
-      { id: 9, date: '2025-11-14', amount: 60, description: 'รถเมล์ไป-กลับ', category: 'ค่าเดินทาง' },
-      { id: 10, date: '2025-11-13', amount: 280, description: 'แท็กซี่กลับบ้าน', category: 'ค่าเดินทาง' },
-      { id: 11, date: '2025-11-12', amount: 45, description: 'รถเมล์ไปมหาลัย', category: 'ค่าเดินทาง' },
-      { id: 12, date: '2025-11-11', amount: 350, description: 'Grab ไปงานเลี้ยง', category: 'ค่าเดินทาง' },
-      { id: 13, date: '2025-11-10', amount: 120, description: 'รถไฟฟ้า BTS', category: 'ค่าเดินทาง' },
-      { id: 14, date: '2025-11-09', amount: 180, description: 'แท็กซี่ไปห้าง', category: 'ค่าเดินทาง' },
-      { id: 15, date: '2025-11-08', amount: 165, description: 'Grab Food + ค่าส่ง', category: 'ค่าเดินทาง' }
-    ]
-  },
-  {
-    id: 3,
-    category: 'เสื้อผ้า',
-    budgetAmount: 2000,
-    spentAmount: 850,
-    month: '2025-11',
-    description: 'เสื้อผ้าและของใช้ส่วนตัว',
-    transactions: [
-      { id: 16, date: '2025-11-12', amount: 850, description: 'เสื้อผ้า Uniqlo', category: 'เสื้อผ้า' }
-    ]
-  },
-  {
-    id: 4,
-    category: 'ความบันเทิง',
-    budgetAmount: 1000,
-    spentAmount: 170,
-    month: '2025-11',
-    description: 'หนัง คอนเสิร์ต เกม',
-    transactions: [
-      { id: 17, date: '2025-11-10', amount: 170, description: 'ค่าหนังที่ SF', category: 'ความบันเทิง' }
-    ]
-  }
-];
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -91,6 +49,8 @@ interface PageProps {
 
 export default function BudgetDetailPage({ params }: PageProps) {
   const router = useRouter();
+  const { budgets, fetchBudgets, updateBudget } = useBudget();
+  const { user } = useUser();
   
   // States
   const [budget, setBudget] = useState<Budget | null>(null);
@@ -100,69 +60,255 @@ export default function BudgetDetailPage({ params }: PageProps) {
   const [newExpense, setNewExpense] = useState({
     amount: '',
     description: '',
-    date: new Date().toISOString().split('T')[0]
+    date: new Date().toISOString().split('T')[0],
+    accountId: ''
   });
+  const [userAccounts, setUserAccounts] = useState<any[]>([]);
   const [sortBy, setSortBy] = useState<'date' | 'amount'>('date');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [filterByDate, setFilterByDate] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize] = useState(10);
 
   // Load budget data
   useEffect(() => {
     async function loadBudgetData() {
       try {
         const resolvedParams = await params;
-        const budgetId = parseInt(resolvedParams.id);
-        const foundBudget = mockBudgets.find(b => b.id === budgetId);
+        const budgetIdStr = resolvedParams.id;
         
-        if (foundBudget) {
-          setBudget(foundBudget);
-        } else {
-          router.push('/dashboard/budgets');
-          return;
-        }
+        console.log('🔍 [Detail Page] Loading budget with ID:', budgetIdStr);
+        console.log('🔍 [Detail Page] Current budgets length:', budgets.length);
+        
+        // Always fetch budgets to ensure we have latest data
+        console.log('📥 [Detail Page] Calling fetchBudgets...');
+        await fetchBudgets();
         
         setLoading(false);
       } catch (error) {
-        console.error('Error loading budget data:', error);
+        console.error('❌ [Detail Page] Error loading budget data:', error);
+        toast.error('เกิดข้อผิดพลาดในการโหลดข้อมูล');
         router.push('/dashboard/budgets');
       }
     }
 
     loadBudgetData();
-  }, [params, router]);
+  }, [params, router, fetchBudgets]);
 
-  // Add expense
-  const handleAddExpense = () => {
+  // Separate effect to handle budget finding after budgets are loaded
+  useEffect(() => {
+    async function findAndLoadBudget() {
+      if (budgets.length === 0 || loading) return;
+      
+      try {
+        const resolvedParams = await params;
+        const budgetIdStr = resolvedParams.id;
+        
+        console.log('🔍 [Detail Page] Looking for budget ID:', budgetIdStr);
+        console.log('🔍 [Detail Page] Budgets available:', budgets.length);
+        console.log('🔍 [Detail Page] Budget list:', budgets.map((b: any) => ({ id: b.id, category: b.category, type: typeof b.id })));
+        
+        // Find budget from loaded data - ID is UUID string
+        const foundBudget = budgets.find((b: any) => {
+          const match = String(b.id) === budgetIdStr;
+          console.log(`🔍 [Detail Page] Comparing ${b.id} (${typeof b.id}) with ${budgetIdStr} (${typeof budgetIdStr}): ${match}`);
+          return match;
+        });
+        
+        if (!foundBudget) {
+          console.log('❌ [Detail Page] Budget not found!');
+          console.log('❌ [Detail Page] Available budgets:', budgets.map((b: any) => ({ id: b.id, category: b.category, type: typeof b.id })));
+          toast.error('ไม่พบงบประมาณที่ต้องการ');
+          router.push('/dashboard/budgets');
+          return;
+        }
+
+        console.log('✅ [Detail Page] Found budget:', foundBudget);
+        
+        // Fetch transactions for this budget
+        await loadTransactions(budgetIdStr, foundBudget);
+      } catch (error) {
+        console.error('Error finding budget:', error);
+        toast.error('เกิดข้อผิดพลาดในการโหลดข้อมูล');
+        router.push('/dashboard/budgets');
+      }
+    }
+
+    findAndLoadBudget();
+  }, [budgets, loading, params, router]);
+
+  // Load transactions for budget
+  const loadTransactions = async (budgetId: string | number, budgetData: any) => {
+    try {
+      // Use periodStart and periodEnd from backend if available, otherwise use month
+      let dateFrom: string;
+      let dateTo: string;
+      
+      if (budgetData.periodStart && budgetData.periodEnd) {
+        dateFrom = new Date(budgetData.periodStart).toISOString().split('T')[0];
+        dateTo = new Date(budgetData.periodEnd).toISOString().split('T')[0];
+      } else if (budgetData.month) {
+        // Parse month to get correct date range
+        const monthDate = new Date(budgetData.month + '-01');
+        const year = monthDate.getFullYear();
+        const month = monthDate.getMonth(); // 0-based month
+        
+        // Get first day of month
+        const firstDay = new Date(year, month, 1);
+        dateFrom = firstDay.toISOString().split('T')[0]; // YYYY-MM-DD format
+        
+        // Get last day of month
+        const lastDay = new Date(year, month + 1, 0); // Day 0 of next month = last day of current month
+        dateTo = lastDay.toISOString().split('T')[0]; // YYYY-MM-DD format
+      } else {
+        // Fallback to current month
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = now.getMonth();
+        const firstDay = new Date(year, month, 1);
+        const lastDay = new Date(year, month + 1, 0);
+        dateFrom = firstDay.toISOString().split('T')[0];
+        dateTo = lastDay.toISOString().split('T')[0];
+      }
+      
+      console.log('📋 [Detail Page] Loading transactions for budget:', budgetId);
+      console.log('📋 [Detail Page] Budget data:', budgetData);
+      console.log('📋 [Detail Page] Date range:', dateFrom, 'to', dateTo);
+      console.log('📋 [Detail Page] Category ID:', budgetData.categoryId);
+
+      // Temporary: Call API directly without auth for testing
+      const apiUrl = `${process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/api/v1"}/transactions?category_id=${budgetData.categoryId}&date_from=${dateFrom}&date_to=${dateTo}&type=expense&limit=1000`;
+      console.log('🌐 [Detail Page] Direct Transaction API call to:', apiUrl);
+      
+      const transactionResponse = await fetch(apiUrl, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      if (!transactionResponse.ok) {
+        throw new Error(`Transaction API error: ${transactionResponse.status}`);
+      }
+      
+      const response = await transactionResponse.json();
+      console.log('📥 [Detail Page] Transaction API Response:', response);
+      
+      const transactions = Array.isArray(response) ? response : (response?.data?.items || response?.items || []);
+      
+      console.log('📋 [Detail Page] Parsed transactions:', transactions);
+      console.log('📋 [Detail Page] Transaction count:', transactions.length);
+      
+      // Calculate spent amount from actual transactions
+      const spentAmount = transactions.reduce((total: number, transaction: any) => {
+        return total + (transaction.amount || 0);
+      }, 0);
+
+      console.log('💰 [Detail Page] Calculated spent amount:', spentAmount);
+
+      const finalBudget = {
+        ...budgetData,
+        transactions: transactions.map((transaction: any) => ({
+          id: transaction.id,
+          date: transaction.transactionDate || transaction.date,
+          amount: transaction.amount,
+          description: transaction.description,
+          categoryId: transaction.categoryId,
+          category: transaction.categoryName || budgetData.category,
+          budgetId: String(budgetId),
+          transactionDate: transaction.transactionDate,
+          userId: transaction.userId,
+          accountId: transaction.accountId,
+          type: transaction.type
+        })),
+        spentAmount
+      };
+      
+      console.log('✅ [Detail Page] Setting final budget:', finalBudget);
+      setBudget(finalBudget);
+    } catch (error) {
+      console.error('Error loading transactions:', error);
+      console.error('Error details:', JSON.stringify(error, null, 2));
+      
+      // Set budget without transactions if API fails
+      const fallbackBudget = {
+        ...budgetData,
+        transactions: [],
+        spentAmount: budgetData.spentAmount || 0
+      };
+      
+      console.log('⚠️ [Detail Page] Setting fallback budget:', fallbackBudget);
+      setBudget(fallbackBudget);
+    }
+  };  // Add expense
+  const handleAddExpense = async () => {
     if (!budget || !newExpense.amount || !newExpense.description) {
       toast.info('กรุณากรอกข้อมูลให้ครบถ้วน');
       return;
     }
 
-    const expenseAmount = parseFloat(newExpense.amount);
-    const newTransaction: Transaction = {
-      id: Math.max(...(budget.transactions.map(t => t.id || 0))) + 1,
-      date: newExpense.date,
-      amount: expenseAmount,
-      description: newExpense.description,
-      category: budget.category
-    };
-
-    setBudget(prev => {
-      if (!prev) return null;
-      return {
-        ...prev,
-        spentAmount: prev.spentAmount + expenseAmount,
-        transactions: [newTransaction, ...prev.transactions]
+    try {
+      const expenseAmount = parseFloat(newExpense.amount);
+      
+      // Create transaction via API
+      const transactionData = {
+        userId: user?.id || '',
+        accountId: newExpense.accountId,
+        categoryId: budget.categoryId || '',
+        type: 'expense' as const,
+        amount: expenseAmount,
+        description: newExpense.description,
+        transactionDate: newExpense.date,
+        budgetId: String(budget.id)
       };
-    });
 
-    setShowAddExpenseModal(false);
-    setNewExpense({
-      amount: '',
-      description: '',
-      date: new Date().toISOString().split('T')[0]
-    });
-    toast.info('บันทึกรายจ่ายเรียบร้อยแล้ว! 💸');
+      console.log('Creating transaction with data:', transactionData);
+
+      await transactionApi.create(transactionData);
+
+        // Reload transactions
+        await loadTransactions(String(budget.id), budget);      setShowAddExpenseModal(false);
+      setNewExpense({
+        amount: '',
+        description: '',
+        date: new Date().toISOString().split('T')[0],
+        accountId: ''
+      });
+      toast.success('บันทึกรายจ่ายเรียบร้อยแล้ว! 💸');
+    } catch (error) {
+      console.error('Error adding expense:', error);
+      toast.error('เกิดข้อผิดพลาดในการบันทึกรายจ่าย');
+    }
+  };
+
+  // Open add expense modal and load accounts
+  const handleOpenAddExpenseModal = async () => {
+    // Load user accounts for selection with fresh balance data
+    if (user?.id) {
+      try {
+        console.log('🏦 Loading accounts for user:', user.id);
+        const accounts = await accountApi.getByUser(user.id);
+        console.log('🏦 Raw accounts response:', accounts);
+        
+        const accountList = Array.isArray(accounts) ? accounts : (accounts as any)?.items || [];
+        console.log('🏦 Processed account list:', accountList);
+        
+        setUserAccounts(accountList);
+        
+        // Set first account as default if available
+        if (accountList.length > 0) {
+          setNewExpense(prev => ({...prev, accountId: accountList[0].id}));
+        }
+        
+        toast.success(`โหลดบัญชี ${accountList.length} รายการแล้ว`);
+      } catch (error) {
+        console.error('Error loading accounts:', error);
+        toast.error('ไม่สามารถโหลดรายการบัญชีได้: ' + (error as Error).message);
+      }
+    } else {
+      toast.error('ไม่พบข้อมูลผู้ใช้');
+    }
+    setShowAddExpenseModal(true);
   };
 
   // Edit budget
@@ -170,29 +316,79 @@ export default function BudgetDetailPage({ params }: PageProps) {
     setShowEditModal(true);
   };
 
-  const confirmEditBudget = () => {
-    if (!budget) return;
-    setShowEditModal(false);
-    toast.info('แก้ไขงบประมาณเรียบร้อยแล้ว! ✅');
+  const confirmEditBudget = async () => {
+    if (!budget) {
+      toast.error('ไม่พบข้อมูลงบประมาณ');
+      return;
+    }
+
+    try {
+      console.log('💾 Starting budget update for ID:', budget.id);
+      console.log('💾 Current budget data:', budget);
+
+      // Convert month (YYYY-MM) to period_start and period_end in YYYY-MM-DD format
+      const monthDate = budget.month ? new Date(budget.month + '-01') : new Date();
+      const year = monthDate.getFullYear();
+      const month = monthDate.getMonth();
+      
+      // Format: YYYY-MM-DD (not ISO string with time)
+      const firstDay = new Date(year, month, 1);
+      const lastDay = new Date(year, month + 1, 0);
+      const periodStart = `${firstDay.getFullYear()}-${String(firstDay.getMonth() + 1).padStart(2, '0')}-${String(firstDay.getDate()).padStart(2, '0')}`;
+      const periodEnd = `${lastDay.getFullYear()}-${String(lastDay.getMonth() + 1).padStart(2, '0')}-${String(lastDay.getDate()).padStart(2, '0')}`;
+
+      // Transform to backend format with correct field names
+      const updatedBudgetData = {
+        categoryId: budget.categoryId?.toString() || '',
+        name: budget.name || budget.category || '',
+        budgetAmount: budget.budgetAmount,
+        periodStart: periodStart,
+        periodEnd: periodEnd,
+        description: budget.description || '',
+        // Keep other fields from original budget
+        budgetMonth: budget.budgetMonth || month + 1,
+        budgetYear: budget.budgetYear || year,
+        alertPercentage: budget.alertPercentage || 80,
+        periodType: budget.periodType || 'monthly',
+        isActive: budget.isActive !== undefined ? budget.isActive : true,
+        autoRollover: budget.autoRollover || false
+      };
+
+      console.log('💾 Update data being sent:', updatedBudgetData);
+
+      await updateBudget(String(budget.id), updatedBudgetData);
+      
+      // Refresh budget data after update
+      await fetchBudgets();
+      
+      setShowEditModal(false);
+      toast.success('แก้ไขงบประมาณเรียบร้อยแล้ว! ✅');
+    } catch (error) {
+      console.error('Error updating budget:', error);
+      console.error('Error details:', JSON.stringify(error, null, 2));
+      toast.error('เกิดข้อผิดพลาดในการแก้ไขงบประมาณ: ' + (error as Error).message);
+    }
   };
 
   // Delete transaction
-  const handleDeleteTransaction = (transactionId: number) => {
+  const handleDeleteTransaction = async (transactionId: string) => {
     if (!budget) return;
     
     const transactionToDelete = budget.transactions.find(t => t.id === transactionId);
     if (!transactionToDelete) return;
 
     if (confirm(`ต้องการลบรายการ "${transactionToDelete.description}" หรือไม่?`)) {
-      setBudget(prev => {
-        if (!prev) return null;
-        return {
-          ...prev,
-          spentAmount: prev.spentAmount - transactionToDelete.amount,
-          transactions: prev.transactions.filter(t => t.id !== transactionId)
-        };
-      });
-      toast.info('ลบรายการเรียบร้อยแล้ว! 🗑️');
+      try {
+        await transactionApi.delete(transactionId);
+        
+        // Reload transactions
+        await loadTransactions(String(budget.id), budget);
+        
+        toast.success('ลบรายการเรียบร้อยแล้ว! 🗑️');
+      } catch (error) {
+        console.error('Error deleting transaction:', error);
+        toast.error('เกิดข้อผิดพลาดในการลบรายการ');
+      }
     }
   };
 
@@ -208,7 +404,7 @@ export default function BudgetDetailPage({ params }: PageProps) {
     }
     
     // Sort transactions
-    return [...filteredTransactions].sort((a, b) => {
+    const sortedTransactions = [...filteredTransactions].sort((a, b) => {
       if (sortBy === 'date') {
         const dateA = new Date(a.date).getTime();
         const dateB = new Date(b.date).getTime();
@@ -217,7 +413,27 @@ export default function BudgetDetailPage({ params }: PageProps) {
         return sortOrder === 'desc' ? b.amount - a.amount : a.amount - b.amount;
       }
     });
+
+    // Apply pagination
+    const startIndex = (currentPage - 1) * pageSize;
+    const endIndex = startIndex + pageSize;
+    return sortedTransactions.slice(startIndex, endIndex);
   };
+
+  // Get total count for pagination
+  const getTotalTransactionCount = () => {
+    if (!budget) return 0;
+    
+    let filteredTransactions = budget.transactions;
+    
+    if (filterByDate) {
+      filteredTransactions = budget.transactions.filter(t => t.date.includes(filterByDate));
+    }
+    
+    return filteredTransactions.length;
+  };
+
+  const totalPages = Math.ceil(getTotalTransactionCount() / pageSize);
 
   // Loading state
   if (loading) {
@@ -382,7 +598,7 @@ export default function BudgetDetailPage({ params }: PageProps) {
                     <span className={`text-sm font-bold ${
                       isOverBudget ? 'text-red-600 dark:text-red-400' : 'text-gray-900 dark:text-white'
                     }`}>
-                      {Math.round(percentageUsed)}%
+                      {Math.min(percentageUsed, 100).toFixed(2)}% ใช้ไป
                     </span>
                   </div>
                   <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-4 mb-2">
@@ -432,7 +648,7 @@ export default function BudgetDetailPage({ params }: PageProps) {
           </div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <button 
-              onClick={() => setShowAddExpenseModal(true)}
+              onClick={handleOpenAddExpenseModal}
               className="group relative bg-gradient-to-br from-blue-500 to-indigo-600 text-white py-4 px-5 rounded-xl hover:from-blue-600 hover:to-indigo-700 transition-all duration-300 font-bold text-center shadow-lg hover:shadow-xl transform hover:scale-105"
             >
               <div className="absolute inset-0 bg-white opacity-0 group-hover:opacity-20 rounded-xl transition-opacity duration-300"></div>
@@ -485,7 +701,10 @@ export default function BudgetDetailPage({ params }: PageProps) {
               <input
                 type="date"
                 value={filterByDate}
-                onChange={(e) => setFilterByDate(e.target.value)}
+                onChange={(e) => {
+                  setFilterByDate(e.target.value);
+                  setCurrentPage(1); // Reset to first page
+                }}
                 className="px-3 py-1 border border-gray-300 dark:border-gray-600 rounded-lg text-sm dark:bg-gray-700 dark:text-white"
                 placeholder="กรองตามวันที่"
               />
@@ -495,6 +714,7 @@ export default function BudgetDetailPage({ params }: PageProps) {
                   const [field, order] = e.target.value.split('-') as [('date' | 'amount'), ('asc' | 'desc')];
                   setSortBy(field);
                   setSortOrder(order);
+                  setCurrentPage(1); // Reset to first page
                 }}
                 className="px-3 py-1 border border-gray-300 dark:border-gray-600 rounded-lg text-sm dark:bg-gray-700 dark:text-white"
               >
@@ -622,7 +842,10 @@ export default function BudgetDetailPage({ params }: PageProps) {
                     {filterByDate ? (
                       <>
                         <button
-                          onClick={() => setFilterByDate('')}
+                          onClick={() => {
+                            setFilterByDate('');
+                            setCurrentPage(1);
+                          }}
                           className="group relative bg-gradient-to-r from-blue-500 to-indigo-600 text-white px-6 py-3 rounded-xl hover:from-blue-600 hover:to-indigo-700 transition-all duration-300 font-semibold shadow-lg hover:shadow-xl transform hover:scale-105"
                         >
                           <span className="relative z-10 flex items-center space-x-2">
@@ -632,7 +855,7 @@ export default function BudgetDetailPage({ params }: PageProps) {
                           <div className="absolute inset-0 bg-white opacity-0 group-hover:opacity-20 rounded-xl transition-opacity duration-300"></div>
                         </button>
                         <button
-                          onClick={() => setShowAddExpenseModal(true)}
+                          onClick={handleOpenAddExpenseModal}
                           className="group relative bg-white dark:bg-gray-800 border-2 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 px-6 py-3 rounded-xl hover:border-blue-400 dark:hover:border-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-all duration-300 font-semibold shadow-lg hover:shadow-xl transform hover:scale-105"
                         >
                           <span className="flex items-center space-x-2">
@@ -643,7 +866,7 @@ export default function BudgetDetailPage({ params }: PageProps) {
                       </>
                     ) : (
                       <button
-                        onClick={() => setShowAddExpenseModal(true)}
+                        onClick={handleOpenAddExpenseModal}
                         className="group relative bg-gradient-to-r from-green-500 to-emerald-600 text-white px-8 py-4 rounded-xl hover:from-green-600 hover:to-emerald-700 transition-all duration-300 font-bold shadow-lg hover:shadow-xl transform hover:scale-105"
                       >
                         <span className="relative z-10 flex items-center space-x-3">
@@ -658,6 +881,54 @@ export default function BudgetDetailPage({ params }: PageProps) {
               </div>
             )}
           </div>
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between mt-8 pt-6 border-t border-gray-200 dark:border-gray-700">
+              <div className="text-sm text-gray-600 dark:text-gray-400">
+                แสดง {Math.min((currentPage - 1) * pageSize + 1, getTotalTransactionCount())}-{Math.min(currentPage * pageSize, getTotalTransactionCount())} จาก {getTotalTransactionCount()} รายการ
+              </div>
+              
+              <div className="flex items-center space-x-2">
+                <button
+                  onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                  disabled={currentPage === 1}
+                  className="px-4 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  ก่อนหน้า
+                </button>
+                
+                <div className="flex space-x-1">
+                  {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                    const pageNum = i + Math.max(1, currentPage - 2);
+                    if (pageNum > totalPages) return null;
+                    
+                    return (
+                      <button
+                        key={pageNum}
+                        onClick={() => setCurrentPage(pageNum)}
+                        className={`px-3 py-2 text-sm rounded-lg transition-colors ${
+                          currentPage === pageNum
+                            ? 'bg-blue-600 text-white'
+                            : 'border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700'
+                        }`}
+                      >
+                        {pageNum}
+                      </button>
+                    );
+                  })}
+                </div>
+                
+                <button
+                  onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+                  disabled={currentPage === totalPages}
+                  className="px-4 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  ถัดไป
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Add Expense Modal */}
@@ -734,6 +1005,25 @@ export default function BudgetDetailPage({ params }: PageProps) {
 
                     <div>
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        บัญชี
+                      </label>
+                      <select
+                        value={newExpense.accountId}
+                        onChange={(e) => setNewExpense(prev => ({...prev, accountId: e.target.value}))}
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                        required
+                      >
+                        <option value="">เลือกบัญชี</option>
+                        {userAccounts.map((account) => (
+                          <option key={account.id} value={account.id}>
+                            {account.name} - ฿{(account.current_balance || 0).toLocaleString()}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                         วันที่
                       </label>
                       <input
@@ -749,7 +1039,7 @@ export default function BudgetDetailPage({ params }: PageProps) {
                 <div className="bg-gray-50 dark:bg-gray-700 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse gap-3">
                   <button
                     onClick={handleAddExpense}
-                    disabled={!newExpense.amount || !newExpense.description}
+                    disabled={!newExpense.amount || !newExpense.description || !newExpense.accountId}
                     className="w-full inline-flex justify-center rounded-lg border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed sm:w-auto sm:text-sm transition-all"
                   >
                     💸 บันทึกรายจ่าย

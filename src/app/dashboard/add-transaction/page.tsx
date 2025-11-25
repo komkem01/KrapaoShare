@@ -328,6 +328,8 @@ export default function AddTransactionPage() {
                 type="date"
                 value={date}
                 onChange={(e) => setDate(e.target.value)}
+                min="2000-01-01"
+                max="2099-12-31"
                 className="w-full px-4 py-3 border border-gray-200 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               />
             </div>

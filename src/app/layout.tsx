@@ -25,7 +25,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "KrapaoShare - จัดการเงินอย่างง่าย",
+  title: "KrapaoShare",
   description: "แอปพลิเคชันจัดการรายรับ-รายจ่าย แบ่งบิล และตั้งเป้าหมายการออมแบบมินิมอล",
 };
 

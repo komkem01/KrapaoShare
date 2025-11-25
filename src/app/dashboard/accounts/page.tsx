@@ -119,6 +119,8 @@ export default function AccountsPage() {
   const [historyError, setHistoryError] = useState<string | null>(null);
   const [selectedAccountFilter, setSelectedAccountFilter] = useState<string>('all');
   const [selectedTypeFilter, setSelectedTypeFilter] = useState<string>('all');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
 
   // Load accounts on mount
   useEffect(() => {
@@ -252,6 +254,37 @@ export default function AccountsPage() {
       return matchesAccount && matchesType;
     });
   }, [accountTransactions, selectedAccountFilter, selectedTypeFilter]);
+
+  // Combine and sort all transactions for pagination
+  const allTransactions = useMemo(() => {
+    const transfers = filteredTransfers.map(transfer => ({
+      ...transfer,
+      type: 'transfer' as const,
+      date: transfer.created_at,
+      id: transfer.id
+    }));
+    
+    const transactions = filteredAccountTransactions.map(transaction => ({
+      ...transaction,
+      type: transaction.transaction_type,
+      date: transaction.created_at,
+      id: transaction.id
+    }));
+
+    return [...transfers, ...transactions].sort((a, b) => 
+      new Date(b.date).getTime() - new Date(a.date).getTime()
+    );
+  }, [filteredTransfers, filteredAccountTransactions]);
+
+  // Pagination calculations
+  const totalPages = Math.ceil(allTransactions.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const paginatedTransactions = allTransactions.slice(startIndex, startIndex + itemsPerPage);
+
+  // Reset to first page when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [selectedAccountFilter, selectedTypeFilter]);
 
   const openBalanceModal = (account: UIAccount, action: 'deposit' | 'withdraw') => {
     setBalanceAccount(account);
@@ -1296,48 +1329,42 @@ export default function AccountsPage() {
                     <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-600">
                       {historyLoading ? (
                         <tr>
-                          <td colSpan={5} className="px-6 py-6 text-center text-sm text-gray-500 dark:text-gray-400">
-                            กำลังโหลดประวัติรายการ...
+                          <td colSpan={5} className="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
+                            <div className="flex items-center justify-center space-x-2">
+                              <div className="animate-spin rounded-full h-6 w-6 border-2 border-blue-600 border-t-transparent"></div>
+                              <span>กำลังโหลดประวัติรายการ...</span>
+                            </div>
                           </td>
                         </tr>
                       ) : historyError ? (
                         <tr>
-                          <td colSpan={5} className="px-6 py-6 text-center text-sm text-red-600 dark:text-red-400">
+                          <td colSpan={5} className="px-6 py-12 text-center text-red-600 dark:text-red-400">
                             {historyError}
                           </td>
                         </tr>
-                      ) : filteredTransfers.length === 0 && filteredAccountTransactions.length === 0 ? (
+                      ) : paginatedTransactions.length === 0 ? (
                         <tr>
-                          <td colSpan={5} className="px-6 py-6 text-center text-sm text-gray-500 dark:text-gray-400">
-                            ยังไม่มีประวัติรายการ
+                          <td colSpan={5} className="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
+                            ไม่พบประวัติรายการ
                           </td>
                         </tr>
                       ) : (
-                        // Combine and sort all transactions by date
-                        (() => {
-                          return [
-                            ...filteredTransfers.map((transfer) => ({
-                              ...transfer,
-                              type: 'transfer' as const,
-                              created_at: transfer.created_at,
-                            })),
-                            ...filteredAccountTransactions.map((transaction) => ({
-                              ...transaction,
-                              type: 'account_transaction' as const,
-                              created_at: transaction.created_at,
-                            }))
-                          ];
-                        })()
-                        .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-                        .map((item) => {
+                        paginatedTransactions.map((item) => {
                           if (item.type === 'transfer') {
-                            const transfer = item as ApiAccountTransfer & { type: 'transfer' };
+                            const transfer = item as typeof item & { from_account_id: string; to_account_id: string; amount: number; note?: string };
                             const fromAccount = accountLookup[transfer.from_account_id];
                             const toAccount = accountLookup[transfer.to_account_id];
+                            
                             return (
                               <tr key={`transfer-${transfer.id}`} className="hover:bg-gray-50 dark:hover:bg-gray-700">
                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                                  {new Date(transfer.created_at).toLocaleDateString('th-TH')}
+                                  {new Date(transfer.date).toLocaleDateString('th-TH', {
+                                    year: 'numeric',
+                                    month: 'short',
+                                    day: 'numeric',
+                                    hour: '2-digit',
+                                    minute: '2-digit'
+                                  })}
                                 </td>
                                 <td className="px-6 py-4 whitespace-nowrap">
                                   <div className="flex items-center space-x-2">
@@ -1371,12 +1398,18 @@ export default function AccountsPage() {
                               </tr>
                             );
                           } else {
-                            const transaction = item as any & { type: 'account_transaction' };
+                            const transaction = item as typeof item & { account_id: string; amount: number; note?: string; transaction_type: string };
                             const account = accountLookup[transaction.account_id];
                             return (
                               <tr key={`transaction-${transaction.id}`} className="hover:bg-gray-50 dark:hover:bg-gray-700">
                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                                  {new Date(transaction.created_at).toLocaleDateString('th-TH')}
+                                  {new Date(transaction.date).toLocaleDateString('th-TH', {
+                                    year: 'numeric',
+                                    month: 'short',
+                                    day: 'numeric',
+                                    hour: '2-digit',
+                                    minute: '2-digit'
+                                  })}
                                 </td>
                                 <td className="px-6 py-4 whitespace-nowrap">
                                   <div className="flex items-center space-x-2">
@@ -1420,6 +1453,194 @@ export default function AccountsPage() {
                     </tbody>
                   </table>
                 </div>
+
+                {/* Pagination */}
+                {totalPages > 1 && (
+                  <div className="px-6 py-4 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700/50">
+                    <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+                      {/* Page Info */}
+                      <div className="flex items-center space-x-4 text-sm text-gray-600 dark:text-gray-400">
+                        <span>
+                          แสดง <span className="font-medium text-gray-900 dark:text-white">{startIndex + 1}</span> - <span className="font-medium text-gray-900 dark:text-white">{Math.min(startIndex + itemsPerPage, allTransactions.length)}</span> จาก <span className="font-medium text-gray-900 dark:text-white">{allTransactions.length}</span> รายการ
+                        </span>
+                        <span className="hidden sm:inline">•</span>
+                        <span className="hidden sm:inline">
+                          หน้า <span className="font-medium text-gray-900 dark:text-white">{currentPage}</span> จาก <span className="font-medium text-gray-900 dark:text-white">{totalPages}</span>
+                        </span>
+                      </div>
+                      
+                      {/* Pagination Controls */}
+                      <div className="flex items-center space-x-1">
+                        {/* First Page */}
+                        <button
+                          onClick={() => setCurrentPage(1)}
+                          disabled={currentPage === 1}
+                          className="px-2 py-1 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white disabled:opacity-50 disabled:cursor-not-allowed rounded-md hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
+                          title="หน้าแรก"
+                        >
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 19l-7-7 7-7M21 19l-7-7 7-7" />
+                          </svg>
+                        </button>
+                        
+                        {/* Previous Page */}
+                        <button
+                          onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                          disabled={currentPage === 1}
+                          className="px-3 py-1 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white disabled:opacity-50 disabled:cursor-not-allowed rounded-md hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors flex items-center space-x-1"
+                        >
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                          </svg>
+                          <span>ก่อนหน้า</span>
+                        </button>
+                        
+                        {/* Page Numbers */}
+                        <div className="flex items-center space-x-1">
+                          {(() => {
+                            const maxVisiblePages = 5;
+                            const pages = [];
+                            let startPage = Math.max(1, currentPage - Math.floor(maxVisiblePages / 2));
+                            let endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
+                            
+                            // Adjust startPage if we're near the end
+                            if (endPage - startPage + 1 < maxVisiblePages) {
+                              startPage = Math.max(1, endPage - maxVisiblePages + 1);
+                            }
+                            
+                            // Show first page and ellipsis if needed
+                            if (startPage > 1) {
+                              pages.push(
+                                <button
+                                  key={1}
+                                  onClick={() => setCurrentPage(1)}
+                                  className="px-3 py-1 text-sm rounded-md text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
+                                >
+                                  1
+                                </button>
+                              );
+                              if (startPage > 2) {
+                                pages.push(
+                                  <span key="ellipsis1" className="px-2 py-1 text-sm text-gray-400">...</span>
+                                );
+                              }
+                            }
+                            
+                            // Show visible page numbers
+                            for (let i = startPage; i <= endPage; i++) {
+                              pages.push(
+                                <button
+                                  key={i}
+                                  onClick={() => setCurrentPage(i)}
+                                  className={`px-3 py-1 text-sm rounded-md transition-colors ${
+                                    currentPage === i
+                                      ? 'bg-blue-600 text-white shadow-sm'
+                                      : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-600'
+                                  }`}
+                                >
+                                  {i}
+                                </button>
+                              );
+                            }
+                            
+                            // Show ellipsis and last page if needed
+                            if (endPage < totalPages) {
+                              if (endPage < totalPages - 1) {
+                                pages.push(
+                                  <span key="ellipsis2" className="px-2 py-1 text-sm text-gray-400">...</span>
+                                );
+                              }
+                              pages.push(
+                                <button
+                                  key={totalPages}
+                                  onClick={() => setCurrentPage(totalPages)}
+                                  className="px-3 py-1 text-sm rounded-md text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
+                                >
+                                  {totalPages}
+                                </button>
+                              );
+                            }
+                            
+                            return pages;
+                          })()}
+                        </div>
+                        
+                        {/* Next Page */}
+                        <button
+                          onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                          disabled={currentPage === totalPages}
+                          className="px-3 py-1 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white disabled:opacity-50 disabled:cursor-not-allowed rounded-md hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors flex items-center space-x-1"
+                        >
+                          <span>ถัดไป</span>
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                          </svg>
+                        </button>
+                        
+                        {/* Last Page */}
+                        <button
+                          onClick={() => setCurrentPage(totalPages)}
+                          disabled={currentPage === totalPages}
+                          className="px-2 py-1 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white disabled:opacity-50 disabled:cursor-not-allowed rounded-md hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
+                          title="หน้าสุดท้าย"
+                        >
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 5l7 7-7 7M3 5l7 7-7 7" />
+                          </svg>
+                        </button>
+                      </div>
+                    </div>
+                    
+                    {/* Items Per Page Selector */}
+                    <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-600 flex items-center justify-between">
+                      <div className="flex items-center space-x-2 text-sm">
+                        <span className="text-gray-600 dark:text-gray-400">แสดงรายการต่อหน้า:</span>
+                        <select
+                          value={itemsPerPage}
+                          onChange={(e) => {
+                            const newItemsPerPage = parseInt(e.target.value);
+                            setItemsPerPage(newItemsPerPage);
+                            setCurrentPage(1); // Reset to first page
+                          }}
+                          className="px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        >
+                          <option value={5}>5</option>
+                          <option value={10}>10</option>
+                          <option value={20}>20</option>
+                          <option value={50}>50</option>
+                        </select>
+                      </div>
+                      
+                      {/* Quick Jump */}
+                      <div className="flex items-center space-x-2 text-sm">
+                        <span className="text-gray-600 dark:text-gray-400">ไปหน้า:</span>
+                        <input
+                          type="number"
+                          min="1"
+                          max={totalPages}
+                          value={currentPage}
+                          onChange={(e) => {
+                            const page = parseInt(e.target.value);
+                            if (page >= 1 && page <= totalPages) {
+                              setCurrentPage(page);
+                            }
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              const page = parseInt(e.currentTarget.value);
+                              if (page >= 1 && page <= totalPages) {
+                                setCurrentPage(page);
+                              }
+                            }
+                          }}
+                          className="w-16 px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-center"
+                          placeholder={currentPage.toString()}
+                        />
+                        <span className="text-gray-600 dark:text-gray-400">/ {totalPages}</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           )}

@@ -70,6 +70,7 @@ export default function TransactionsPage() {
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
+    if (isNaN(date.getTime())) return 'วันที่ไม่ถูกต้อง';
     return date.toLocaleDateString('th-TH', {
       year: 'numeric',
       month: 'short',
@@ -697,6 +698,8 @@ export default function TransactionsPage() {
                       type="date"
                       value={editDate}
                       onChange={(e) => setEditDate(e.target.value)}
+                      min="2000-01-01"
+                      max="2099-12-31"
                       className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     />
                   </div>

@@ -74,19 +74,38 @@ export default function NotificationPanel({
     }
   };
 
-  const formatTimestamp = (created_at: string) => {
-    const timestamp = new Date(created_at);
+  const formatTimestamp = (dateString: string) => {
+    if (!dateString) return 'วันที่ไม่ถูกต้อง';
+    
+    // Try parsing the original ISO string directly first
+    let timestamp = new Date(dateString);
+    
+    if (isNaN(timestamp.getTime())) {
+      // If direct parsing fails, try without Z and microseconds
+      let dateStr = dateString;
+      if (dateStr.endsWith('Z')) dateStr = dateStr.slice(0, -1);
+      dateStr = dateStr.replace(/\.(\d{3,6})/, '');
+      dateStr = dateStr.replace('T', ' ');
+      timestamp = new Date(dateStr);
+    }
+    
+    if (isNaN(timestamp.getTime())) {
+      return 'วันที่ไม่ถูกต้อง';
+    }
+    
     const now = new Date();
     const diff = now.getTime() - timestamp.getTime();
     const minutes = Math.floor(diff / (1000 * 60));
     const hours = Math.floor(diff / (1000 * 60 * 60));
     const days = Math.floor(diff / (1000 * 60 * 60 * 24));
 
+    // If date is in the future, show 'เมื่อสักครู่'
+    if (diff < 0) return 'เมื่อสักครู่';
     if (minutes < 1) return 'เมื่อสักครู่';
     if (minutes < 60) return `${minutes} นาทีที่แล้ว`;
     if (hours < 24) return `${hours} ชั่วโมงที่แล้ว`;
     if (days < 7) return `${days} วันที่แล้ว`;
-    return timestamp.toLocaleDateString('th-TH');
+    return timestamp.toLocaleDateString('th-TH', { year: 'numeric', month: 'short', day: 'numeric' });
   };
 
   // Helper function to get category from notification data or type
@@ -126,9 +145,11 @@ export default function NotificationPanel({
     }
   });
 
-  const sortedNotifications = [...filteredNotifications].sort((a, b) => 
-    new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-  );
+  const sortedNotifications = [...filteredNotifications].sort((a, b) => {
+    const dateA = a.created_at || (a as any).createdAt;
+    const dateB = b.created_at || (b as any).createdAt;
+    return new Date(dateB).getTime() - new Date(dateA).getTime();
+  });
 
   // Pagination logic
   const totalPages = Math.ceil(sortedNotifications.length / itemsPerPage);
@@ -246,9 +267,9 @@ export default function NotificationPanel({
                           </p>
                           <div className="flex items-center justify-between mt-2">
                             <p className="text-xs text-gray-500 dark:text-gray-500 font-light">
-                              {formatTimestamp(notification.created_at)}
+                              {formatTimestamp(notification.created_at || (notification as any).createdAt)}
                             </p>
-                            {notification.is_read && notification.read_at && (
+                            {notification.is_read && (notification.read_at || (notification as any).readAt) && (
                               <p className="text-xs text-green-600 dark:text-green-400 font-light">
                                 อ่านแล้ว
                               </p>

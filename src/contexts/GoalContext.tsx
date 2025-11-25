@@ -12,27 +12,34 @@ import { useUser } from "./UserContext";
 
 export type Goal = {
   id: string;
-  user_id: string;
+  userId: string;
+  categoryId?: string;
   name: string;
-  target_amount: number;
-  current_amount: number;
-  target_date?: string;
   description?: string;
-  category?: string;
-  status: "active" | "completed" | "cancelled";
-  created_at: string;
-  updated_at: string;
+  targetAmount: number;
+  currentAmount: number;
+  targetDate?: string;
+  priority: 'low' | 'medium' | 'high' | 'critical';
+  goalType: 'savings' | 'purchase' | 'debt_payoff';
+  autoSaveAmount: number;
+  autoSaveFrequency?: 'daily' | 'weekly' | 'monthly' | 'yearly';
+  isCompleted: boolean;
+  completedAt?: string;
+  createdAt: string;
+  updatedAt: string;
 };
 
 export type GoalContribution = {
   id: string;
-  goal_id: string;
-  user_id: string;
+  sharedGoalId: string;
+  userId: string;
+  transactionId?: string;
   amount: number;
-  contribution_date: string;
+  contributionDate: string;
+  contributionMethod: 'manual' | 'transfer' | 'auto';
   notes?: string;
-  created_at: string;
-  updated_at: string;
+  createdAt: string;
+  updatedAt: string;
 };
 
 type GoalContextType = {
@@ -42,10 +49,10 @@ type GoalContextType = {
   error: string | null;
   fetchGoals: () => Promise<void>;
   fetchContributions: (goalId?: string) => Promise<void>;
-  createGoal: (data: Omit<Goal, "id" | "created_at" | "updated_at" | "current_amount" | "status">) => Promise<Goal>;
+  createGoal: (data: Omit<Goal, "id" | "createdAt" | "updatedAt" | "currentAmount" | "isCompleted">) => Promise<Goal>;
   updateGoal: (id: string, data: Partial<Goal>) => Promise<Goal>;
   deleteGoal: (id: string) => Promise<void>;
-  addContribution: (data: Omit<GoalContribution, "id" | "created_at" | "updated_at">) => Promise<GoalContribution>;
+  addContribution: (data: Omit<GoalContribution, "id" | "createdAt" | "updatedAt">) => Promise<GoalContribution>;
   updateContribution: (id: string, data: Partial<GoalContribution>) => Promise<GoalContribution>;
   deleteContribution: (id: string) => Promise<void>;
   getGoalById: (id: string) => Goal | undefined;
@@ -72,8 +79,23 @@ export const GoalProvider: React.FC<{ children: React.ReactNode }> = ({
     try {
       setLoading(true);
       setError(null);
-      const data = await goalApi.list({ user_id: user.id });
-      setGoals(Array.isArray(data) ? data : []);
+      const response = await goalApi.list({ user_id: user.id });
+      
+      console.log('Raw goals response:', response); // Debug log
+      
+      // Handle response format with items array
+      let goalsData: Goal[] = [];
+      if (response && typeof response === 'object') {
+        if ('items' in response && Array.isArray(response.items)) {
+          goalsData = response.items;
+          console.log('Found goals in items:', goalsData.length); // Debug log
+        } else if (Array.isArray(response)) {
+          goalsData = response;
+          console.log('Found goals as array:', goalsData.length); // Debug log
+        }
+      }
+      
+      setGoals(goalsData);
     } catch (err) {
       console.error("Failed to fetch goals:", err);
       setError(err instanceof Error ? err.message : "Failed to load goals");
@@ -102,13 +124,13 @@ export const GoalProvider: React.FC<{ children: React.ReactNode }> = ({
   }, [fetchGoals]);
 
   const createGoal = async (
-    data: Omit<Goal, "id" | "created_at" | "updated_at" | "current_amount" | "status">
+    data: Omit<Goal, "id" | "createdAt" | "updatedAt" | "currentAmount" | "isCompleted">
   ): Promise<Goal> => {
     if (!user?.id) throw new Error("User not authenticated");
 
     const newGoal = await goalApi.create({
       ...data,
-      user_id: user.id,
+      userId: user.id,
     }) as Goal;
 
     setGoals((prev) => [...prev, newGoal]);
@@ -127,17 +149,17 @@ export const GoalProvider: React.FC<{ children: React.ReactNode }> = ({
   };
 
   const addContribution = async (
-    data: Omit<GoalContribution, "id" | "created_at" | "updated_at">
+    data: Omit<GoalContribution, "id" | "createdAt" | "updatedAt">
   ): Promise<GoalContribution> => {
     const newContribution = await goalContributionApi.create(data) as GoalContribution;
     setContributions((prev) => [...prev, newContribution]);
     
     // Update goal's current amount
-    const goal = goals.find(g => g.id === data.goal_id);
+    const goal = goals.find(g => g.id === data.sharedGoalId);
     if (goal) {
       setGoals(prev => prev.map(g => 
-        g.id === data.goal_id 
-          ? { ...g, current_amount: g.current_amount + data.amount }
+        g.id === data.sharedGoalId 
+          ? { ...g, currentAmount: g.currentAmount + data.amount }
           : g
       ));
     }
@@ -162,8 +184,8 @@ export const GoalProvider: React.FC<{ children: React.ReactNode }> = ({
     // Update goal's current amount
     if (contribution) {
       setGoals(prev => prev.map(g => 
-        g.id === contribution.goal_id 
-          ? { ...g, current_amount: Math.max(0, g.current_amount - contribution.amount) }
+        g.id === contribution.sharedGoalId 
+          ? { ...g, currentAmount: Math.max(0, g.currentAmount - contribution.amount) }
           : g
       ));
     }
