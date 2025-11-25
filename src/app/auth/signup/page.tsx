@@ -20,6 +20,8 @@ export default function SignUpPage() {
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [successMessage, setSuccessMessage] = useState('');
+  const [redirecting, setRedirecting] = useState(false);
+  const router = typeof window !== 'undefined' ? require('next/navigation').useRouter() : null;
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -130,6 +132,11 @@ export default function SignUpPage() {
         password: '',
         confirmPassword: ''
       });
+      setRedirecting(true);
+      setTimeout(() => {
+        if (router) router.push('/auth/login');
+        else window.location.href = '/auth/login';
+      }, 1200);
     } catch (error) {
       console.error('Signup error:', error);
       setErrors({ general: 'เกิดข้อผิดพลาดในการสมัครสมาชิก' });

@@ -28,17 +28,41 @@ export function UserProvider({ children }: UserProviderProps) {
     try {
       setLoading(true);
       setError(null);
+      console.log('🔍 Fetching user data...');
       
       // ลองดึงจาก localStorage ก่อน
       const storedUser = getStoredUser();
+      console.log('💾 Stored user:', storedUser);
       if (storedUser) {
         setUser(storedUser as User);
+        return; // ใช้ stored user แทน
       }
 
+      // TODO: Remove this mock user - for testing only
+      const mockUser = {
+        id: '2b4b9985-d299-43a7-a954-c0e2b47e9450',
+        email: 'test@example.com',
+        firstname: 'Test',
+        lastname: 'User',
+        role: 'member' as const,
+        status: 'active' as const,
+        timezone: 'Asia/Bangkok',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      };
+      console.log('🧪 Using mock user for testing:', mockUser);
+      setUser(mockUser as User);
+      setStoredUser(mockUser as unknown as Record<string, unknown>);
+
+      // Uncomment this when you have real authentication
+      /*
       // ดึงข้อมูลล่าสุดจาก API
+      console.log('🌐 Calling authApi.me()...');
       const userData = await authApi.me() as User;
+      console.log('👤 User data from API:', userData);
       setUser(userData);
       setStoredUser(userData as unknown as Record<string, unknown>);
+      */
     } catch (err) {
       console.error('Error fetching user:', err);
       setError(err instanceof Error ? err.message : 'เกิดข้อผิดพลาดในการดึงข้อมูลผู้ใช้');

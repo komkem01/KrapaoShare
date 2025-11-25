@@ -4,131 +4,77 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import { toast } from '@/utils/toast';
-
-// Types
-interface Deposit {
-  date: string;
-  amount: number;
-  note: string;
-}
-
-interface Goal {
-  id: number;
-  name: string;
-  currentAmount: number;
-  targetAmount: number;
-  targetDate: string;
-  description: string;
-  category: string;
-  createdDate: string;
-  deposits: Deposit[];
-  completedDate?: string;
-}
-
-// Mock data
-const mockGoals: Goal[] = [
-  {
-    id: 1,
-    name: 'ซื้อ MacBook ใหม่',
-    currentAmount: 25000,
-    targetAmount: 65000,
-    targetDate: '2026-06-15',
-    description: 'MacBook Air M3 สำหรับทำงาน',
-    category: 'เทคโนโลยี',
-    createdDate: '2025-10-01',
-    deposits: [
-      { date: '2025-11-01', amount: 10000, note: 'เงินเดือนเดือนแรก' },
-      { date: '2025-11-15', amount: 15000, note: 'โบนัสจากงาน' }
-    ]
-  },
-  {
-    id: 2,
-    name: 'ทริปญี่ปุ่น',
-    currentAmount: 8500,
-    targetAmount: 45000,
-    targetDate: '2026-03-01',
-    description: 'เที่ยวญี่ปุ่น 7 วัน รวมตั้งเครื่อง',
-    category: 'ท่องเที่ยว',
-    createdDate: '2025-09-15',
-    deposits: [
-      { date: '2025-10-01', amount: 5000, note: 'เริ่มออม' },
-      { date: '2025-11-01', amount: 3500, note: 'ออมต่อเนื่อง' }
-    ]
-  },
-  {
-    id: 3,
-    name: 'กองทุนฉุกเฉิน',
-    currentAmount: 15000,
-    targetAmount: 30000,
-    targetDate: '2025-12-31',
-    description: 'เงินสำรองสำหรับเหตุฉุกเฉิน 3 เดือน',
-    category: 'การเงิน',
-    createdDate: '2025-08-01',
-    deposits: [
-      { date: '2025-08-15', amount: 5000, note: 'เริ่มต้น' },
-      { date: '2025-09-15', amount: 5000, note: 'รายเดือน' },
-      { date: '2025-10-15', amount: 5000, note: 'รายเดือน' }
-    ]
-  },
-  {
-    id: 4,
-    name: 'iPhone 15 Pro',
-    currentAmount: 42000,
-    targetAmount: 42000,
-    targetDate: '2025-10-15',
-    completedDate: '2025-10-10',
-    description: 'อัพเกรดโทรศัพท์ใหม่',
-    category: 'เทคโนโลยี',
-    createdDate: '2025-06-01',
-    deposits: [
-      { date: '2025-06-01', amount: 20000, note: 'เงินเดือน' },
-      { date: '2025-07-01', amount: 22000, note: 'เงินเดือน + โบนัส' }
-    ]
-  }
-];
+import { useGoal } from '@/contexts/GoalContext';
+import { useUser } from '@/contexts/UserContext';
+import { useAccounts } from '@/contexts/AccountContext';
+import type { Goal } from '@/contexts/GoalContext';
+import { goalDepositApi } from '@/utils/apiClient';
 
 interface PageProps {
   params: Promise<{ id: string }>;
 }
 
+interface GoalDeposit {
+  id: string;
+  goalId: string;
+  userId: string;
+  transactionId: string;
+  fromAccountId: string;
+  amount: number;
+  depositDate: string;
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export default function GoalDetailPage({ params }: PageProps) {
   const router = useRouter();
+  const { user } = useUser();
+  const { goals, updateGoal, getGoalById, fetchGoals, deleteGoal } = useGoal();
+  const { accounts } = useAccounts();
   
   // States
   const [goal, setGoal] = useState<Goal | null>(null);
   const [loading, setLoading] = useState(true);
   const [showDepositModal, setShowDepositModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [depositAmount, setDepositAmount] = useState('');
   const [depositNote, setDepositNote] = useState('');
-  const [sortBy, setSortBy] = useState<'date' | 'amount'>('date');
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+  const [selectedAccountId, setSelectedAccountId] = useState<string>('');
+  const [deposits, setDeposits] = useState<GoalDeposit[]>([]);
+  const [depositsLoading, setDepositsLoading] = useState(false);
 
   const [editForm, setEditForm] = useState({
     name: '',
     targetAmount: '',
     targetDate: '',
     description: '',
-    category: 'ทั่วไป'
+    priority: 'medium' as 'low' | 'medium' | 'high' | 'critical',
+    goalType: 'savings' as 'savings' | 'purchase' | 'debt_payoff'
   });
 
-  // Load goal data
+  // Load goal data and deposits
   useEffect(() => {
     async function loadGoalData() {
       try {
         const resolvedParams = await params;
-        const goalId = parseInt(resolvedParams.id);
-        const foundGoal = mockGoals.find(g => g.id === goalId);
+        const goalId = resolvedParams.id;
+        const foundGoal = getGoalById(goalId);
         
         if (foundGoal) {
           setGoal(foundGoal);
           setEditForm({
             name: foundGoal.name,
             targetAmount: foundGoal.targetAmount.toString(),
-            targetDate: foundGoal.targetDate,
-            description: foundGoal.description,
-            category: foundGoal.category
+            targetDate: foundGoal.targetDate || '',
+            description: foundGoal.description || '',
+            priority: foundGoal.priority,
+            goalType: foundGoal.goalType
           });
+
+          // Load deposits for this goal
+          await loadDeposits(goalId);
         } else {
           router.push('/dashboard/goals');
           return;
@@ -141,97 +87,164 @@ export default function GoalDetailPage({ params }: PageProps) {
       }
     }
 
-    loadGoalData();
-  }, [params, router]);
+    if (goals.length > 0) {
+      loadGoalData();
+    }
+  }, [params, router, goals, getGoalById]);
+
+  // Load accounts on mount
+  useEffect(() => {
+    if (user?.id && accounts.length === 0) {
+      // Accounts will be loaded by AccountContext automatically
+    }
+  }, [user?.id, accounts.length]);
+
+  // Auto-select first account
+  useEffect(() => {
+    if (accounts.length > 0 && !selectedAccountId) {
+      setSelectedAccountId(accounts[0].id.toString());
+    }
+  }, [accounts, selectedAccountId]);
+
+  // Load deposits function
+  const loadDeposits = async (goalId: string) => {
+    if (!user?.id) return;
+    
+    setDepositsLoading(true);
+    try {
+      const response = await goalDepositApi.list({
+        goal_id: goalId,
+        user_id: user.id
+      }) as { items?: GoalDeposit[] };
+      
+      if (response.items) {
+        setDeposits(response.items);
+      }
+    } catch (error) {
+      console.error('Error loading deposits:', error);
+      toast.error('เกิดข้อผิดพลาด', 'ไม่สามารถโหลดรายการฝากเงินได้');
+    } finally {
+      setDepositsLoading(false);
+    }
+  };
 
   // Add deposit
-  const handleAddDeposit = () => {
-    if (!goal || !depositAmount) {
-      toast.warning('ข้อมูลไม่ครบถ้วน', 'กรุณากรอกจำนวนเงิน');
+  const handleAddDeposit = async () => {
+    if (!goal || !depositAmount || !selectedAccountId || !user?.id) {
+      toast.warning('ข้อมูลไม่ครบถ้วน', 'กรุณาเลือกบัญชีและกรอกจำนวนเงิน');
       return;
     }
 
     const amount = parseFloat(depositAmount);
-    const deposit: Deposit = {
-      date: new Date().toISOString().split('T')[0],
-      amount,
-      note: depositNote || 'โอนเงินเข้าเป้าหมาย'
-    };
-
-    const newCurrentAmount = goal.currentAmount + amount;
-    const updatedGoal = {
-      ...goal,
-      currentAmount: newCurrentAmount,
-      deposits: [deposit, ...goal.deposits]
-    };
-
-    // Check if goal is completed
-    if (newCurrentAmount >= goal.targetAmount && !goal.completedDate) {
-      updatedGoal.completedDate = new Date().toISOString().split('T')[0];
-      setTimeout(() => toast.success('🎉 ยินดีด้วย!', 'คุณบรรลุเป้าหมายแล้ว!'), 500);
+    
+    // Validate amount
+    if (amount <= 0) {
+      toast.warning('จำนวนเงินไม่ถูกต้อง', 'กรุณากรอกจำนวนเงินที่มากกว่า 0');
+      return;
     }
 
-    setGoal(updatedGoal);
-    setShowDepositModal(false);
-    setDepositAmount('');
-    setDepositNote('');
-    toast.success('โอนเงินสำเร็จ! 💰', `โอนเงิน ฿${amount.toLocaleString()} เข้าเป้าหมายเรียบร้อยแล้ว`);
+    // Check account balance
+    const selectedAccount = accounts.find((acc: any) => acc.id.toString() === selectedAccountId);
+    if (selectedAccount && selectedAccount.current_balance < amount) {
+      toast.error('ยอดเงินไม่เพียงพอ', `บัญชีมียอดคงเหลือ ฿${selectedAccount.current_balance.toLocaleString()}`);
+      return;
+    }
+
+    try {
+      // Create deposit via API
+      await goalDepositApi.create({
+        goalId: goal.id,
+        userId: user.id,
+        fromAccountId: selectedAccountId,
+        amount: amount,
+        notes: depositNote || undefined
+      });
+
+      // Refresh data
+      await Promise.all([
+        fetchGoals(),
+        loadDeposits(goal.id)
+      ]);
+
+      // Update local goal state
+      const updatedGoal = getGoalById(goal.id);
+      if (updatedGoal) {
+        setGoal(updatedGoal);
+        
+        // Check if goal is completed
+        if (updatedGoal.isCompleted && !goal.isCompleted) {
+          setTimeout(() => toast.success('🎉 ยินดีด้วย!', 'คุณบรรลุเป้าหมายแล้ว!'), 500);
+        }
+      }
+      
+      setShowDepositModal(false);
+      setDepositAmount('');
+      setDepositNote('');
+      toast.success('โอนเงินสำเร็จ! 💰', `โอนเงิน ฿${amount.toLocaleString()} เข้าเป้าหมายเรียบร้อยแล้ว`);
+    } catch (error) {
+      console.error('Error adding deposit:', error);
+      toast.error('เกิดข้อผิดพลาด', 'ไม่สามารถโอนเงินได้');
+    }
   };
 
   // Edit goal
-  const handleUpdateGoal = () => {
+  const handleUpdateGoal = async () => {
     if (!goal || !editForm.name || !editForm.targetAmount || !editForm.targetDate) {
       toast.warning('ข้อมูลไม่ครบถ้วน', 'กรุณากรอกข้อมูลให้ครบถ้วน');
       return;
     }
 
-    const updatedGoal = {
-      ...goal,
-      name: editForm.name,
-      targetAmount: parseFloat(editForm.targetAmount),
-      targetDate: editForm.targetDate,
-      description: editForm.description,
-      category: editForm.category
-    };
+    try {
+      await updateGoal(goal.id, {
+        name: editForm.name,
+        targetAmount: parseFloat(editForm.targetAmount),
+        targetDate: editForm.targetDate,
+        description: editForm.description || undefined,
+        priority: editForm.priority,
+        goalType: editForm.goalType
+      });
 
-    setGoal(updatedGoal);
-    setShowEditModal(false);
-    toast.success('แก้ไขเป้าหมายสำเร็จ! ✅', `แก้ไขเป้าหมาย "${editForm.name}" เรียบร้อยแล้ว`);
-  };
-
-  // Delete deposit
-  const handleDeleteDeposit = (depositIndex: number) => {
-    if (!goal) return;
-    
-    const depositToDelete = goal.deposits[depositIndex];
-    if (!depositToDelete) return;
-
-    if (confirm(`ต้องการลบรายการฝาก "${depositToDelete.note}" หรือไม่?`)) {
-      const updatedGoal = {
+      setGoal({
         ...goal,
-        currentAmount: goal.currentAmount - depositToDelete.amount,
-        deposits: goal.deposits.filter((_, index) => index !== depositIndex),
-        completedDate: undefined // Remove completion if deleting brings amount below target
-      };
+        name: editForm.name,
+        targetAmount: parseFloat(editForm.targetAmount),
+        targetDate: editForm.targetDate,
+        description: editForm.description,
+        priority: editForm.priority,
+        goalType: editForm.goalType
+      });
 
-      setGoal(updatedGoal);
-      toast.info('ลบรายการฝากเรียบร้อยแล้ว! 🗑️');
+      setShowEditModal(false);
+      toast.success('แก้ไขเป้าหมายสำเร็จ! ✅', `แก้ไขเป้าหมาย "${editForm.name}" เรียบร้อยแล้ว`);
+    } catch (error) {
+      console.error('Error updating goal:', error);
+      toast.error('เกิดข้อผิดพลาด', 'ไม่สามารถแก้ไขเป้าหมายได้');
     }
   };
 
-  // Get sorted deposits
-  const getSortedDeposits = () => {
-    if (!goal) return [];
-    
-    return [...goal.deposits].sort((a, b) => {
-      if (sortBy === 'date') {
-        const dateA = new Date(a.date).getTime();
-        const dateB = new Date(b.date).getTime();
-        return sortOrder === 'desc' ? dateB - dateA : dateA - dateB;
-      } else {
-        return sortOrder === 'desc' ? b.amount - a.amount : a.amount - b.amount;
-      }
-    });
+  // Delete goal - Show confirmation modal
+  const handleDeleteGoal = () => {
+    if (!goal) return;
+    setShowDeleteModal(true);
+  };
+
+  // Confirm delete goal
+  const confirmDeleteGoal = async () => {
+    if (!goal) return;
+
+    try {
+      setShowDeleteModal(false);
+      await deleteGoal(goal.id);
+      toast.success('ลบเป้าหมายสำเร็จ! 🗑️', `ลบเป้าหมาย "${goal.name}" และคืนเงิน ฿${goal.currentAmount.toLocaleString()} เรียบร้อยแล้ว`);
+      
+      // Redirect to goals page after short delay
+      setTimeout(() => {
+        router.push('/dashboard/goals');
+      }, 1500);
+    } catch (error) {
+      console.error('Error deleting goal:', error);
+      toast.error('เกิดข้อผิดพลาด', 'ไม่สามารถลบเป้าหมายได้');
+    }
   };
 
   // Loading state
@@ -296,13 +309,25 @@ export default function GoalDetailPage({ params }: PageProps) {
   // Calculate statistics
   const progressPercentage = (goal.currentAmount / goal.targetAmount) * 100;
   const remainingAmount = goal.targetAmount - goal.currentAmount;
-  const daysLeft = Math.ceil((new Date(goal.targetDate).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
-  const isCompleted = progressPercentage >= 100;
+  const daysLeft = goal.targetDate ? Math.ceil((new Date(goal.targetDate).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)) : 0;
+  const isCompleted = goal.isCompleted || progressPercentage >= 100;
   const isNearDeadline = daysLeft <= 30 && daysLeft > 0;
   const isOverdue = daysLeft < 0 && !isCompleted;
-  const sortedDeposits = getSortedDeposits();
-  const averageDeposit = goal.deposits.length > 0 ? goal.currentAmount / goal.deposits.length : 0;
-  const categories = ['ทั่วไป', 'เทคโนโลยี', 'ท่องเที่ยว', 'การเงิน', 'สุขภาพ', 'การศึกษา', 'บ้านและที่อยู่', 'รถยนต์'];
+  
+  // Goal type display mapping
+  const goalTypeMap: Record<string, string> = {
+    'savings': 'ออมเงิน',
+    'purchase': 'ซื้อของ',
+    'debt_payoff': 'ชำระหนี้'
+  };
+  
+  // Priority display mapping
+  const priorityMap: Record<string, string> = {
+    'low': 'ต่ำ',
+    'medium': 'ปานกลาง',
+    'high': 'สูง',
+    'critical': 'สูงมาก'
+  };
 
   return (
     <DashboardLayout>
@@ -327,7 +352,15 @@ export default function GoalDetailPage({ params }: PageProps) {
                     {goal.name}
                   </h1>
                   <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200">
-                    {goal.category}
+                    {goalTypeMap[goal.goalType] || goal.goalType}
+                  </span>
+                  <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold ${
+                    goal.priority === 'critical' ? 'bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200' :
+                    goal.priority === 'high' ? 'bg-orange-100 dark:bg-orange-900 text-orange-800 dark:text-orange-200' :
+                    goal.priority === 'medium' ? 'bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200' :
+                    'bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200'
+                  }`}>
+                    {priorityMap[goal.priority] || goal.priority}
                   </span>
                   <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold ${
                     isCompleted
@@ -344,9 +377,13 @@ export default function GoalDetailPage({ params }: PageProps) {
                 <p className="text-gray-600 dark:text-gray-400 ml-1 flex items-center space-x-2">
                   <span>{goal.description}</span>
                   <span>•</span>
-                  <span>สร้างเมื่อ {new Date(goal.createdDate).toLocaleDateString('th-TH')}</span>
-                  <span>•</span>
-                  <span>เป้าหมาย {new Date(goal.targetDate).toLocaleDateString('th-TH')}</span>
+                  <span>สร้างเมื่อ {new Date(goal.createdAt).toLocaleDateString('th-TH')}</span>
+                  {goal.targetDate && (
+                    <>
+                      <span>•</span>
+                      <span>เป้าหมาย {new Date(goal.targetDate).toLocaleDateString('th-TH')}</span>
+                    </>
+                  )}
                 </p>
               </div>
             </div>
@@ -385,8 +422,8 @@ export default function GoalDetailPage({ params }: PageProps) {
                   </p>
                 </div>
                 <div>
-                  <span className="text-sm text-gray-600 dark:text-gray-400">เฉลี่ยต่อครั้ง:</span>
-                  <p className="text-lg font-semibold text-gray-900 dark:text-white">฿{averageDeposit.toLocaleString()}</p>
+                  <span className="text-sm text-gray-600 dark:text-gray-400">ความสำคัญ:</span>
+                  <p className="text-lg font-semibold text-gray-900 dark:text-white">{priorityMap[goal.priority]}</p>
                 </div>
               </div>
             </div>
@@ -432,8 +469,8 @@ export default function GoalDetailPage({ params }: PageProps) {
                 
                 <div className="grid grid-cols-2 gap-4">
                   <div className="text-center p-4 bg-green-50 dark:bg-green-900 rounded-xl">
-                    <p className="text-sm text-green-600 dark:text-green-400 font-medium">รายการฝาก</p>
-                    <p className="text-2xl font-bold text-green-700 dark:text-green-300">{goal.deposits.length}</p>
+                    <p className="text-sm text-green-600 dark:text-green-400 font-medium">ความคืบหน้า</p>
+                    <p className="text-2xl font-bold text-green-700 dark:text-green-300">{Math.round(progressPercentage)}%</p>
                   </div>
                   <div className="text-center p-4 bg-blue-50 dark:bg-blue-900 rounded-xl">
                     <p className="text-sm text-blue-600 dark:text-blue-400 font-medium">เหลือวัน</p>
@@ -457,7 +494,7 @@ export default function GoalDetailPage({ params }: PageProps) {
               การดำเนินการ
             </h2>
           </div>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
             {!isCompleted && (
               <button 
                 onClick={() => setShowDepositModal(true)}
@@ -491,164 +528,87 @@ export default function GoalDetailPage({ params }: PageProps) {
               <div className="text-2xl mb-2">🖨️</div>
               <div className="text-sm">พิมพ์</div>
             </button>
+            <button 
+              onClick={handleDeleteGoal}
+              className="group relative bg-white dark:bg-gray-700 border-2 border-red-300 dark:border-red-600 text-red-600 dark:text-red-400 py-4 px-5 rounded-xl hover:border-red-400 dark:hover:border-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-all duration-300 font-bold text-center shadow-lg hover:shadow-xl transform hover:scale-105"
+            >
+              <div className="text-2xl mb-2">🗑️</div>
+              <div className="text-sm">ลบเป้าหมาย</div>
+            </button>
           </div>
         </div>
 
-        {/* Deposits History */}
+        {/* Deposit History */}
         <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 p-8 shadow-lg hover:shadow-xl transition-all duration-300">
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center space-x-3">
               <div className="w-8 h-8 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-lg flex items-center justify-center">
-                <span className="text-white text-sm font-bold">💳</span>
+                <span className="text-white text-sm font-bold">📜</span>
               </div>
               <h2 className="text-xl font-bold text-gray-900 dark:text-white">
-                ประวัติการฝาก
+                ประวัติการฝากเงิน
               </h2>
-              <span className="px-3 py-1 bg-gradient-to-r from-indigo-100 to-purple-100 dark:from-indigo-900 dark:to-purple-900 text-indigo-700 dark:text-indigo-300 rounded-full text-sm font-semibold">
-                {sortedDeposits.length} รายการ
-              </span>
             </div>
-            
-            {/* Sort controls */}
-            <div className="flex items-center space-x-3">
-              <select
-                value={`${sortBy}-${sortOrder}`}
-                onChange={(e) => {
-                  const [field, order] = e.target.value.split('-') as [('date' | 'amount'), ('asc' | 'desc')];
-                  setSortBy(field);
-                  setSortOrder(order);
-                }}
-                className="px-3 py-1 border border-gray-300 dark:border-gray-600 rounded-lg text-sm dark:bg-gray-700 dark:text-white"
-              >
-                <option value="date-desc">วันที่ (ใหม่ → เก่า)</option>
-                <option value="date-asc">วันที่ (เก่า → ใหม่)</option>
-                <option value="amount-desc">จำนวน (มาก → น้อย)</option>
-                <option value="amount-asc">จำนวน (น้อย → มาก)</option>
-              </select>
-            </div>
+            <span className="text-sm text-gray-500 dark:text-gray-400">
+              ทั้งหมด {deposits.length} รายการ
+            </span>
           </div>
 
-          <div className="space-y-3">
-            {sortedDeposits.length > 0 ? (
-              sortedDeposits.map((deposit, index) => (
-                <div key={index} className="group relative overflow-hidden bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 hover:border-green-300 dark:hover:border-green-600 transition-all duration-300 hover:shadow-xl transform hover:scale-[1.02] hover:-translate-y-1">
-                  {/* Gradient background overlay */}
-                  <div className="absolute inset-0 bg-gradient-to-r from-green-50/50 via-transparent to-emerald-50/50 dark:from-green-900/10 dark:via-transparent dark:to-emerald-900/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-                  
-                  {/* Top accent line */}
-                  <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-green-500 via-emerald-500 to-teal-500 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-                  
-                  <div className="relative p-6">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-4">
-                        {/* Icon with animation */}
-                        <div className="relative">
-                          <div className="w-14 h-14 bg-gradient-to-br from-green-500 via-emerald-500 to-teal-600 rounded-2xl flex items-center justify-center shadow-lg group-hover:shadow-xl group-hover:scale-110 transition-all duration-300">
-                            <span className="text-white text-xl">💰</span>
-                          </div>
-                          {/* Pulse effect */}
-                          <div className="absolute inset-0 w-14 h-14 bg-green-400 rounded-2xl opacity-0 group-hover:opacity-20 group-hover:scale-125 transition-all duration-500"></div>
-                        </div>
-                        
-                        {/* Content */}
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-start justify-between">
-                            <div className="flex-1 pr-4">
-                              <h3 className="text-lg font-bold text-gray-900 dark:text-white group-hover:text-green-600 dark:group-hover:text-green-400 transition-colors duration-300 line-clamp-2">
-                                {deposit.note}
-                              </h3>
-                              <div className="flex items-center space-x-3 mt-2">
-                                <div className="flex items-center space-x-1 text-sm text-gray-500 dark:text-gray-400">
-                                  <span>📅</span>
-                                  <span className="font-medium">
-                                    {new Date(deposit.date).toLocaleDateString('th-TH', {
-                                      weekday: 'short',
-                                      day: 'numeric',
-                                      month: 'short',
-                                      year: 'numeric'
-                                    })}
-                                  </span>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                      
-                      {/* Amount and actions */}
-                      <div className="flex items-center space-x-4">
-                        <div className="text-right">
-                          <div className="flex items-center space-x-2">
-                            <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
-                            <p className="text-2xl font-bold text-green-600 dark:text-green-400 group-hover:text-green-500 transition-colors duration-300">
-                              +฿{deposit.amount.toLocaleString()}
-                            </p>
-                          </div>
-                          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 font-medium">
-                            {deposit.amount > 10000 ? 'ฝากใหญ่' : deposit.amount > 5000 ? 'ฝากกลาง' : 'ฝากเล็ก'}
-                          </p>
-                        </div>
-                        
-                        {/* Delete button */}
-                        <button
-                          onClick={() => handleDeleteDeposit(index)}
-                          className="opacity-0 group-hover:opacity-100 p-3 text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-xl transition-all duration-300 hover:scale-110 active:scale-95"
-                          title="ลบรายการ"
-                        >
-                          <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                            <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
-                          </svg>
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                  
-                  {/* Bottom shadow effect */}
-                  <div className="absolute bottom-0 left-0 right-0 h-2 bg-gradient-to-t from-black/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-                </div>
-              ))
-            ) : (
-              <div className="text-center py-16">
-                <div className="relative mx-auto mb-8">
-                  {/* Animated background circles */}
-                  <div className="absolute inset-0 w-32 h-32 bg-gradient-to-br from-green-100 to-emerald-100 dark:from-green-900/30 dark:to-emerald-900/30 rounded-full opacity-50 animate-pulse"></div>
-                  <div className="absolute inset-2 w-28 h-28 bg-gradient-to-br from-blue-100 to-indigo-100 dark:from-blue-900/30 dark:to-indigo-900/30 rounded-full opacity-60 animate-pulse delay-150"></div>
-                  
-                  {/* Main icon */}
-                  <div className="relative w-32 h-32 bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-600 rounded-full flex items-center justify-center mx-auto shadow-lg">
-                    <div className="relative">
-                      <span className="text-6xl animate-bounce">💰</span>
-                      <div className="absolute -top-2 -right-2 w-6 h-6 bg-gradient-to-br from-orange-400 to-red-500 rounded-full flex items-center justify-center">
-                        <span className="text-white text-xs">✨</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-                
-                <div className="max-w-md mx-auto space-y-4">
-                  <h3 className="text-2xl font-bold text-gray-900 dark:text-white">
-                    🎯 เริ่มต้นการฝาก
-                  </h3>
-                  <p className="text-lg text-gray-600 dark:text-gray-400 leading-relaxed">
-                    ยังไม่มีประวัติการฝากเงิน เริ่มฝากเงินเพื่อให้บรรลุเป้าหมายของคุณ
-                  </p>
-                  
-                  <div className="pt-4">
-                    <button
-                      onClick={() => setShowDepositModal(true)}
-                      className="group relative bg-gradient-to-r from-green-500 to-emerald-600 text-white px-8 py-4 rounded-xl hover:from-green-600 hover:to-emerald-700 transition-all duration-300 font-bold shadow-lg hover:shadow-xl transform hover:scale-105"
-                    >
-                      <span className="relative z-10 flex items-center space-x-3">
-                        <span className="text-xl">💰</span>
-                        <span>เริ่มฝากเงิน</span>
-                      </span>
-                      <div className="absolute inset-0 bg-white opacity-0 group-hover:opacity-20 rounded-xl transition-opacity duration-300"></div>
-                    </button>
-                  </div>
-                </div>
+          {depositsLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <div className="text-center">
+                <div className="w-12 h-12 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mx-auto mb-4"></div>
+                <p className="text-gray-500 dark:text-gray-400">กำลังโหลดรายการ...</p>
               </div>
-            )}
-          </div>
+            </div>
+          ) : deposits.length === 0 ? (
+            <div className="text-center py-12">
+              <div className="w-20 h-20 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center mx-auto mb-4">
+                <span className="text-4xl">💰</span>
+              </div>
+              <p className="text-gray-500 dark:text-gray-400 mb-2">ยังไม่มีรายการฝากเงิน</p>
+              <p className="text-sm text-gray-400 dark:text-gray-500">เริ่มฝากเงินเพื่อบรรลุเป้าหมายของคุณ</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {deposits.map((deposit) => {
+                const account = accounts.find((acc: any) => acc.id.toString() === deposit.fromAccountId);
+                return (
+                  <div
+                    key={deposit.id}
+                    className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
+                  >
+                    <div className="flex items-center space-x-4">
+                      <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-emerald-600 rounded-lg flex items-center justify-center">
+                        <span className="text-white text-xl">💵</span>
+                      </div>
+                      <div>
+                        <p className="font-semibold text-gray-900 dark:text-white">
+                          ฝากเงิน ฿{deposit.amount.toLocaleString()}
+                        </p>
+                        <p className="text-sm text-gray-500 dark:text-gray-400">
+                          จาก {account?.name || 'บัญชีที่ถูกลบ'}
+                          {deposit.notes && ` • ${deposit.notes}`}
+                        </p>
+                        <p className="text-xs text-gray-400 dark:text-gray-500">
+                          {new Date(deposit.depositDate).toLocaleDateString('th-TH', {
+                            year: 'numeric',
+                            month: 'long',
+                            day: 'numeric'
+                          })}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200">
+                        สำเร็จ
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
 
         {/* Deposit Modal */}
@@ -688,6 +648,30 @@ export default function GoalDetailPage({ params }: PageProps) {
 
                     <div>
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        เลือกบัญชี *
+                      </label>
+                      <select
+                        value={selectedAccountId}
+                        onChange={(e) => setSelectedAccountId(e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                        required
+                      >
+                        <option value="">เลือกบัญชี</option>
+                        {accounts.map((account: any) => (
+                          <option key={account.id} value={account.id.toString()}>
+                            {account.name} - ฿{account.current_balance.toLocaleString()}
+                          </option>
+                        ))}
+                      </select>
+                      {accounts.length === 0 && (
+                        <p className="text-sm text-red-600 dark:text-red-400 mt-1">
+                          ⚠️ ไม่มีบัญชี กรุณาสร้างบัญชีก่อน
+                        </p>
+                      )}
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                         จำนวนเงิน *
                       </label>
                       <div className="relative">
@@ -723,7 +707,7 @@ export default function GoalDetailPage({ params }: PageProps) {
                 <div className="bg-gray-50 dark:bg-gray-700 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse gap-3">
                   <button
                     onClick={handleAddDeposit}
-                    disabled={!depositAmount}
+                    disabled={!depositAmount || !selectedAccountId || accounts.length === 0}
                     className="w-full inline-flex justify-center rounded-lg border border-transparent shadow-sm px-4 py-2 bg-green-600 text-base font-medium text-white hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed sm:w-auto sm:text-sm transition-all"
                   >
                     💰 ฝากเงิน
@@ -809,18 +793,32 @@ export default function GoalDetailPage({ params }: PageProps) {
 
                     <div>
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                        หมวดหมู่
+                        ประเภทเป้าหมาย
                       </label>
                       <select
-                        value={editForm.category}
-                        onChange={(e) => setEditForm(prev => ({...prev, category: e.target.value}))}
+                        value={editForm.goalType}
+                        onChange={(e) => setEditForm(prev => ({...prev, goalType: e.target.value as 'savings' | 'purchase' | 'debt_payoff'}))}
                         className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
                       >
-                        {categories.map((category) => (
-                          <option key={category} value={category}>
-                            {category}
-                          </option>
-                        ))}
+                        <option value="savings">ออมเงิน</option>
+                        <option value="purchase">ซื้อของ</option>
+                        <option value="debt_payoff">ชำระหนี้</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        ความสำคัญ
+                      </label>
+                      <select
+                        value={editForm.priority}
+                        onChange={(e) => setEditForm(prev => ({...prev, priority: e.target.value as 'low' | 'medium' | 'high' | 'critical'}))}
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                      >
+                        <option value="low">ต่ำ</option>
+                        <option value="medium">ปานกลาง</option>
+                        <option value="high">สูง</option>
+                        <option value="critical">สูงมาก</option>
                       </select>
                     </div>
 
@@ -850,6 +848,129 @@ export default function GoalDetailPage({ params }: PageProps) {
                     className="mt-3 sm:mt-0 w-full inline-flex justify-center rounded-lg border border-gray-300 dark:border-gray-600 shadow-sm px-4 py-2 bg-white dark:bg-gray-800 text-base font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 sm:w-auto sm:text-sm transition-all"
                   >
                     ❌ ยกเลิก
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Delete Confirmation Modal */}
+        {showDeleteModal && goal && (
+          <div className="fixed inset-0 z-50 overflow-y-auto">
+            <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+              {/* Backdrop */}
+              <div 
+                className="fixed inset-0 transition-opacity backdrop-blur-sm" 
+                onClick={() => setShowDeleteModal(false)}
+              >
+                <div className="absolute inset-0 bg-gray-900/80 dark:bg-black/80"></div>
+              </div>
+
+              {/* Center modal vertically */}
+              <span className="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+
+              {/* Modal */}
+              <div className="inline-block align-bottom bg-white dark:bg-gray-800 rounded-2xl text-left overflow-hidden shadow-2xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full relative z-10 border border-gray-200 dark:border-gray-700">
+                {/* Header with gradient */}
+                <div className="relative bg-gradient-to-r from-red-500 to-pink-600 px-6 py-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-10 h-10 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center">
+                        <span className="text-2xl">🗑️</span>
+                      </div>
+                      <h3 className="text-xl font-bold text-white">
+                        ยืนยันการลบเป้าหมาย
+                      </h3>
+                    </div>
+                    <button
+                      onClick={() => setShowDeleteModal(false)}
+                      className="text-white/80 hover:text-white transition-colors p-1 hover:bg-white/10 rounded-lg"
+                    >
+                      <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Content */}
+                <div className="bg-white dark:bg-gray-800 px-6 py-6">
+                  <div className="space-y-4">
+                    {/* Warning message */}
+                    <div className="flex items-start space-x-3 p-4 bg-red-50 dark:bg-red-900/20 rounded-xl border border-red-100 dark:border-red-800">
+                      <div className="flex-shrink-0 mt-0.5">
+                        <svg className="h-6 w-6 text-red-600 dark:text-red-400" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                        </svg>
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-sm font-medium text-red-900 dark:text-red-100">
+                          คุณกำลังจะลบเป้าหมายนี้
+                        </p>
+                        <p className="text-sm text-red-700 dark:text-red-300 mt-1">
+                          การกระทำนี้ไม่สามารถยกเลิกได้
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Goal details */}
+                    <div className="bg-gray-50 dark:bg-gray-700/50 rounded-xl p-4 space-y-3">
+                      <div className="flex items-center space-x-2">
+                        <span className="text-gray-500 dark:text-gray-400 text-sm">เป้าหมาย:</span>
+                        <span className="font-semibold text-gray-900 dark:text-white">{goal.name}</span>
+                      </div>
+                      
+                      {goal.currentAmount > 0 && (
+                        <div className="pt-3 border-t border-gray-200 dark:border-gray-600">
+                          <div className="flex items-start space-x-3 p-3 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg border border-yellow-200 dark:border-yellow-700">
+                            <div className="flex-shrink-0">
+                              <span className="text-2xl">💰</span>
+                            </div>
+                            <div className="flex-1">
+                              <p className="text-sm font-medium text-yellow-900 dark:text-yellow-100 mb-1">
+                                ระบบจะคืนเงินอัตโนมัติ
+                              </p>
+                              <p className="text-sm text-yellow-800 dark:text-yellow-200">
+                                จำนวน <span className="font-bold text-lg">฿{goal.currentAmount.toLocaleString()}</span>
+                              </p>
+                              <p className="text-xs text-yellow-700 dark:text-yellow-300 mt-1">
+                                เงินจะถูกโอนกลับไปยังบัญชีที่ฝากเข้ามา
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Confirmation text */}
+                    <div className="text-center py-2">
+                      <p className="text-sm text-gray-600 dark:text-gray-400">
+                        กรุณายืนยันว่าคุณต้องการลบเป้าหมายนี้
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Footer buttons */}
+                <div className="bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-700 dark:to-gray-800 px-6 py-4 flex flex-col-reverse sm:flex-row gap-3 sm:justify-end">
+                  <button
+                    onClick={() => setShowDeleteModal(false)}
+                    className="w-full sm:w-auto inline-flex justify-center items-center space-x-2 px-6 py-3 rounded-xl border-2 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 hover:border-gray-400 dark:hover:border-gray-500 transition-all duration-200 font-medium shadow-sm"
+                  >
+                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                    <span>ยกเลิก</span>
+                  </button>
+                  <button
+                    onClick={confirmDeleteGoal}
+                    className="w-full sm:w-auto inline-flex justify-center items-center space-x-2 px-6 py-3 rounded-xl bg-gradient-to-r from-red-600 to-pink-600 text-white hover:from-red-700 hover:to-pink-700 transition-all duration-200 font-bold shadow-lg hover:shadow-xl transform hover:scale-105"
+                  >
+                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                    <span>ลบเป้าหมาย</span>
                   </button>
                 </div>
               </div>

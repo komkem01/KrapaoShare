@@ -3,16 +3,22 @@
 import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import DashboardLayout from '@/components/layout/DashboardLayout';
+import { toast } from 'sonner';
+import { sharedGoalApi, sharedGoalMemberApi, goalContributionApi, accountApi } from '@/utils/apiClient';
+import { useUser } from '@/contexts/UserContext';
 
 interface Member {
+  id: string;
   name: string;
   amount: number;
   target: number;
   joinDate: string;
   email?: string;
+  userId: string;
 }
 
 interface Activity {
+  id: string;
   date: string;
   member: string;
   amount: number;
@@ -21,7 +27,7 @@ interface Activity {
 }
 
 interface SharedGoal {
-  id: number;
+  id: string;
   name: string;
   targetAmount: number;
   currentAmount: number;
@@ -32,130 +38,382 @@ interface SharedGoal {
   members: Member[];
   recentActivity: Activity[];
   createdBy: string;
+  createdById: string;
   isPublic: boolean;
   autoSave: boolean;
   monthlyTarget: number;
   groupCode: string;
+  status: 'active' | 'completed' | 'cancelled';
 }
 
 export default function SharedGoalDetailPage() {
   const router = useRouter();
   const params = useParams();
-  const goalId = parseInt(params.id as string);
+  const { user } = useUser();
+  const goalId = params.id as string;
 
   const [goal, setGoal] = useState<SharedGoal | null>(null);
+  const [loading, setLoading] = useState(true);
   const [showDepositModal, setShowDepositModal] = useState(false);
   const [showInviteModal, setShowInviteModal] = useState(false);
-  const [showManageModal, setShowManageModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
   const [depositAmount, setDepositAmount] = useState('');
   const [depositNote, setDepositNote] = useState('');
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [copySuccess, setCopySuccess] = useState(false);
   const [isCopying, setIsCopying] = useState(false);
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [isInviting, setIsInviting] = useState(false);
+  const [inviteTab, setInviteTab] = useState<'code' | 'email'>('code');
   const [activeTab, setActiveTab] = useState<'overview' | 'members' | 'activity' | 'settings'>('overview');
 
-  // Mock data - ในอนาคตจะเชื่อมกับ API
-  const mockGoalsData: { [key: number]: SharedGoal } = {
-    1: {
-      id: 1,
-      name: 'ทริปญี่ปุ่น 2026',
-      targetAmount: 150000,
-      currentAmount: 45000,
-      targetDate: '2026-03-15',
-      description: 'ทริปเที่ยวญี่ปุ่น 10 วัน ช่วงซากุระบาน รวมตั๋วเครื่องบิน ที่พัก และค่าใช้จ่ายต่างๆ',
-      category: 'ท่องเที่ยว',
-      createdDate: '2025-10-01',
-      groupCode: 'JAPAN2026',
-      members: [
-        { name: 'คุณ', amount: 25000, target: 50000, joinDate: '2025-10-01', email: 'you@example.com' },
-        { name: 'มิกิ', amount: 15000, target: 50000, joinDate: '2025-10-05', email: 'miki@example.com' },
-        { name: 'โยชิ', amount: 5000, target: 50000, joinDate: '2025-10-10', email: 'yoshi@example.com' }
-      ],
-      recentActivity: [
-        { date: '2025-11-10', member: 'มิกิ', amount: 5000, type: 'deposit', note: 'เงินโบนัสเดือนนี้' },
-        { date: '2025-11-08', member: 'คุณ', amount: 10000, type: 'deposit', note: 'เงินเดือนส่วนหนึ่ง' },
-        { date: '2025-11-05', member: 'โยชิ', amount: 5000, type: 'deposit', note: 'เก็บจากการทำงานพิเศษ' },
-        { date: '2025-10-20', member: 'คุณ', amount: 15000, type: 'deposit', note: 'เงินออมเดือนก่อน' },
-        { date: '2025-10-10', member: 'โยชิ', amount: 0, type: 'join', note: 'เข้าร่วมกลุ่ม' }
-      ],
-      createdBy: 'คุณ',
-      isPublic: false,
-      autoSave: true,
-      monthlyTarget: 15000
-    },
-    2: {
-      id: 2,
-      name: 'ซื้อรถร่วมกัน',
-      targetAmount: 300000,
-      currentAmount: 120000,
-      targetDate: '2025-12-31',
-      description: 'รถยนต์มือสองสำหรับใช้ร่วมกัน Toyota Vios 2020',
-      category: 'รถยนต์',
-      createdDate: '2025-09-01',
-      groupCode: 'CAR2025X',
-      members: [
-        { name: 'คุณ', amount: 60000, target: 100000, joinDate: '2025-09-01', email: 'you@example.com' },
-        { name: 'แอน', amount: 40000, target: 100000, joinDate: '2025-09-15', email: 'ann@example.com' },
-        { name: 'บิว', amount: 20000, target: 100000, joinDate: '2025-10-01', email: 'bew@example.com' }
-      ],
-      recentActivity: [
-        { date: '2025-11-12', member: 'บิว', amount: 20000, type: 'deposit', note: 'เงินจากการขายของเก่า' },
-        { date: '2025-11-01', member: 'คุณ', amount: 30000, type: 'deposit', note: 'เงินโบนัสประจำปี' },
-        { date: '2025-10-15', member: 'แอน', amount: 40000, type: 'deposit', note: 'เงินจากการลงทุน' },
-        { date: '2025-10-01', member: 'บิว', amount: 0, type: 'join', note: 'เข้าร่วมกลุ่ม' }
-      ],
-      createdBy: 'คุณ',
-      isPublic: false,
-      autoSave: false,
-      monthlyTarget: 25000
-    }
-  };
+  // Edit form states
+  const [editName, setEditName] = useState('');
+  const [editDescription, setEditDescription] = useState('');
+  const [editTargetAmount, setEditTargetAmount] = useState('');
+  const [editTargetDate, setEditTargetDate] = useState('');
+  const [editCategory, setEditCategory] = useState('');
+  const [editAccountId, setEditAccountId] = useState<string>('');
+  
+  // Accounts data
+  const [accounts, setAccounts] = useState<any[]>([]);
 
+  // Load user accounts
   useEffect(() => {
-    const goalData = mockGoalsData[goalId];
-    if (goalData) {
-      setGoal(goalData);
-    }
-  }, [goalId]);
+    if (!user?.id) return;
+    
+    const loadAccounts = async () => {
+      try {
+        const accountsData = await accountApi.getByUser(user.id) as any[];
+        setAccounts(accountsData || []);
+      } catch (error) {
+        console.error('Error loading accounts:', error);
+      }
+    };
+    
+    loadAccounts();
+  }, [user?.id]);
 
-  const handleDeposit = () => {
-    if (!depositAmount || !goal) return;
+  // Load goal data from API
+  useEffect(() => {
+    if (!goalId) return;
+    
+    const loadGoalData = async () => {
+      try {
+        setLoading(true);
+        
+        // Fetch goal details
+        const goalData = await sharedGoalApi.getById(goalId) as any;
+        
+        // Fetch members
+        const membersData = await sharedGoalMemberApi.getByGoal(goalId) as any[];
+        
+        // Fetch contributions
+        let contributions: any[] = [];
+        try {
+          contributions = await goalContributionApi.getByGoal(goalId) as any[];
+        } catch (error) {
+          console.error('Error loading contributions:', error);
+        }
 
-    const amount = parseFloat(depositAmount);
-    if (amount <= 0) return;
+        // Transform members data
+        const members: Member[] = membersData.map((member: any) => ({
+          id: member.id,
+          name: `${member.user?.firstName || member.user?.first_name || ''} ${member.user?.lastName || member.user?.last_name || ''}`.trim() || 'Unknown',
+          userId: member.userId || member.user_id,
+          amount: member.contributionAmount || member.contribution_amount || 0,
+          target: goalData.target_amount / membersData.length,
+          joinDate: member.joinedAt || member.joined_at || member.createdAt || member.created_at,
+          email: member.user?.email
+        }));
 
-    // อัพเดทยอดเงินของสมาชิก "คุณ"
-    const updatedMembers = goal.members.map(member => 
-      member.name === 'คุณ' 
-        ? { ...member, amount: member.amount + amount }
-        : member
-    );
+        // Create a map of userId to member name for contributions
+        const userIdToName = new Map<string, string>();
+        members.forEach(member => {
+          userIdToName.set(member.userId, member.name);
+        });
 
-    // เพิ่มกิจกรรมใหม่
-    const newActivity: Activity = {
-      date: new Date().toISOString().split('T')[0],
-      member: 'คุณ',
-      amount: amount,
-      type: 'deposit',
-      note: depositNote || 'ฝากเงินเข้าเป้าหมาย'
+        // Transform contributions to activities
+        const activities: Activity[] = contributions.map((contrib: any) => {
+          const userId = contrib.userId || contrib.user_id;
+          const memberName = userIdToName.get(userId) || 'Unknown';
+          
+          return {
+            id: contrib.id,
+            date: contrib.contributionDate || contrib.contribution_date || contrib.createdAt || contrib.created_at,
+            member: memberName,
+            amount: contrib.amount || 0,
+            type: 'deposit' as const,
+            note: contrib.notes
+          };
+        });
+
+        const transformedGoal: SharedGoal = {
+          id: goalData.id,
+          name: goalData.name,
+          targetAmount: goalData.targetAmount || goalData.target_amount || 0,
+          currentAmount: goalData.currentAmount || goalData.current_amount || 0,
+          targetDate: goalData.targetDate || goalData.target_date || '',
+          description: goalData.description || '',
+          category: goalData.category || 'ทั่วไป',
+          createdDate: goalData.createdAt || goalData.created_at,
+          groupCode: goalData.shareCode || goalData.share_code || '',
+          members,
+          recentActivity: activities.sort((a, b) => 
+            new Date(b.date).getTime() - new Date(a.date).getTime()
+          ),
+          createdBy: (() => {
+            // Try to get creator name from creator object first
+            const creatorFromData = `${goalData.creator?.firstName || goalData.creator?.first_name || ''} ${goalData.creator?.lastName || goalData.creator?.last_name || ''}`.trim();
+            if (creatorFromData) return creatorFromData;
+            
+            // Otherwise, find creator from members list
+            const creatorId = goalData.createdByUserId || goalData.createdBy || goalData.created_by;
+            const creatorMember = members.find(m => m.userId === creatorId);
+            return creatorMember?.name || 'Unknown';
+          })(),
+          createdById: goalData.createdByUserId || goalData.createdBy || goalData.created_by,
+          isPublic: goalData.isPublic || false,
+          autoSave: goalData.autoSave || goalData.auto_save || false,
+          monthlyTarget: goalData.monthlyTarget || goalData.monthly_target || 0,
+          status: goalData.status || 'active',
+          accountId: goalData.accountId || goalData.account_id || null
+        } as any;
+
+        setGoal(transformedGoal);
+      } catch (error: any) {
+        console.error('Error loading goal:', error);
+        toast.error('ไม่สามารถโหลดข้อมูลเป้าหมายได้');
+      } finally {
+        setLoading(false);
+      }
     };
 
-    setGoal(prev => prev ? {
-      ...prev,
-      currentAmount: prev.currentAmount + amount,
-      members: updatedMembers,
-      recentActivity: [newActivity, ...prev.recentActivity]
-    } : null);
+    loadGoalData();
+  }, [goalId]);
 
-    // รีเซ็ตฟอร์ม
-    setDepositAmount('');
-    setDepositNote('');
-    setShowDepositModal(false);
+  const openEditModal = () => {
+    if (!goal) return;
+    setEditName(goal.name);
+    setEditDescription(goal.description);
+    setEditTargetAmount(goal.targetAmount.toString());
+    setEditTargetDate(goal.targetDate.split('T')[0]); // Format: YYYY-MM-DD
+    setEditCategory(goal.category);
+    setEditAccountId((goal as any).accountId || '');
+    setShowEditModal(true);
   };
 
-  const handleShowGroupCode = () => {
-    // แสดงรหัสกลุ่มให้ผู้ใช้แชร์
-    console.log('Showing group code for goal:', goal?.id, 'Code:', goal?.groupCode);
-    setShowInviteModal(false);
+  const handleEditGoal = async () => {
+    if (!goal || !editName || !editTargetAmount || !editTargetDate) {
+      toast.error('กรุณากรอกข้อมูลให้ครบถ้วน');
+      return;
+    }
+
+    const targetAmount = parseFloat(editTargetAmount);
+    if (targetAmount <= 0) {
+      toast.error('จำนวนเงินเป้าหมายต้องมากกว่า 0');
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      // Convert date string to ISO timestamp
+      const targetDateISO = editTargetDate ? new Date(editTargetDate + 'T00:00:00Z').toISOString() : undefined;
+      
+      await sharedGoalApi.update(goal.id, {
+        name: editName,
+        description: editDescription,
+        targetAmount: targetAmount,
+        targetDate: targetDateISO,
+        accountId: editAccountId || undefined
+      });
+
+      toast.success('แก้ไขเป้าหมายสำเร็จ!');
+      setShowEditModal(false);
+      
+      // Reload data
+      window.location.reload();
+    } catch (error: any) {
+      console.error('Error updating goal:', error);
+      toast.error(error.message || 'ไม่สามารถแก้ไขเป้าหมายได้');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleDeposit = async () => {
+    if (!depositAmount || !goal || !user?.id) return;
+
+    const amount = parseFloat(depositAmount);
+    if (amount <= 0) {
+      toast.error('กรุณาระบุจำนวนเงินที่ถูกต้อง');
+      return;
+    }
+
+    try {
+      const linkedAccountId = (goal as any).accountId;
+      
+      // ถ้ามีบัญชีเชื่อมโยง ต้องเช็คว่ามียอดเงินพอหรือไม่
+      if (linkedAccountId) {
+        const linkedAccount = accounts.find(acc => acc.id === linkedAccountId);
+        if (linkedAccount) {
+          const currentBalance = linkedAccount.currentBalance || linkedAccount.current_balance || 0;
+          if (currentBalance < amount) {
+            toast.error(`ยอดเงินในบัญชีไม่พอ (มี ฿${currentBalance.toLocaleString()})`);
+            return;
+          }
+        }
+      }
+
+      // Create contribution
+      await goalContributionApi.create({
+        sharedGoalId: goal.id,
+        userId: user.id,
+        amount: amount,
+        contributionDate: new Date().toISOString(),
+        contributionMethod: 'manual',
+        notes: depositNote
+      });
+
+      // Update shared goal current amount
+      await sharedGoalApi.update(goal.id, {
+        currentAmount: goal.currentAmount + amount
+      });
+
+      // Update member contribution
+      const membership = await sharedGoalMemberApi.getGoalUserMembership(goal.id, user.id) as any;
+      if (membership?.id) {
+        await sharedGoalMemberApi.update(membership.id, {
+          contributionAmount: (membership.contributionAmount || 0) + amount
+        });
+      }
+
+      // ถ้ามีบัญชีเชื่อมโยง ให้หักเงินจากบัญชีนั้น
+      if (linkedAccountId) {
+        const linkedAccount = accounts.find(acc => acc.id === linkedAccountId);
+        if (linkedAccount) {
+          const currentBalance = linkedAccount.currentBalance || linkedAccount.current_balance || 0;
+          const newBalance = currentBalance - amount;
+          
+          // อัพเดทยอดเงินในบัญชี
+          await accountApi.update(linkedAccountId, {
+            current_balance: newBalance
+          });
+
+          toast.success(`ฝากเงิน ฿${amount.toLocaleString()} สำเร็จ! (หักจากบัญชี ${linkedAccount.name})`);
+        } else {
+          toast.success(`ฝากเงิน ฿${amount.toLocaleString()} สำเร็จ!`);
+        }
+      } else {
+        toast.success(`ฝากเงิน ฿${amount.toLocaleString()} สำเร็จ!`);
+      }
+      
+      // Reload data
+      window.location.reload();
+    } catch (error: any) {
+      console.error('Error depositing:', error);
+      toast.error(error.message || 'ไม่สามารถฝากเงินได้');
+    }
+  };
+
+  const handleInviteMember = async () => {
+    if (!inviteEmail || !goal) {
+      toast.error('กรุณากรอกอีเมล');
+      return;
+    }
+
+    // Simple email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(inviteEmail)) {
+      toast.error('รูปแบบอีเมลไม่ถูกต้อง');
+      return;
+    }
+
+    setIsInviting(true);
+    try {
+      // Call API to invite member by email
+      await sharedGoalMemberApi.inviteByEmail({
+        sharedGoalId: goal.id,
+        email: inviteEmail
+      });
+
+      toast.success(`ส่งคำเชิญไปที่ ${inviteEmail} สำเร็จ!`);
+      setInviteEmail('');
+      setShowInviteModal(false);
+      
+      // Reload data
+      setTimeout(() => window.location.reload(), 1000);
+    } catch (error: any) {
+      console.error('Error inviting member:', error);
+      toast.error(error.message || 'ไม่สามารถเชิญสมาชิกได้');
+    } finally {
+      setIsInviting(false);
+    }
+  };
+
+  const handleDeleteGoal = async () => {
+    if (!goal) return;
+    
+    setIsDeleting(true);
+    try {
+      const linkedAccountId = (goal as any).accountId;
+      
+      // ถ้ามีบัญชีเชื่อมโยง และมียอดเงินในเป้าหมาย ให้คืนเงินกลับบัญชี
+      if (linkedAccountId && goal.currentAmount > 0) {
+        const linkedAccount = accounts.find(acc => acc.id === linkedAccountId);
+        if (linkedAccount) {
+          const currentBalance = linkedAccount.currentBalance || linkedAccount.current_balance || 0;
+          const newBalance = currentBalance + goal.currentAmount;
+          
+          // คืนเงินกลับบัญชี
+          await accountApi.update(linkedAccountId, {
+            current_balance: newBalance
+          });
+          
+          console.log(`Refunded ฿${goal.currentAmount.toLocaleString()} to account ${linkedAccount.name}`);
+        }
+      }
+      
+      // ลบเป้าหมาย
+      await sharedGoalApi.delete(goal.id);
+      
+      if (linkedAccountId && goal.currentAmount > 0) {
+        toast.success(`ลบเป้าหมายสำเร็จ และคืนเงิน ฿${goal.currentAmount.toLocaleString()} กลับบัญชีแล้ว`);
+      } else {
+        toast.success('ลบเป้าหมายสำเร็จ');
+      }
+      
+      // Redirect to list page
+      router.push('/dashboard/shared-goals');
+    } catch (error: any) {
+      console.error('Error deleting goal:', error);
+      toast.error(error.message || 'ไม่สามารถลบเป้าหมายได้');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const handleLeaveGroup = async () => {
+    if (!goal || !user?.id) return;
+    
+    if (confirm('คุณแน่ใจหรือไม่ที่จะออกจากกลุ่มนี้?')) {
+      try {
+        // Find membership and delete
+        const membership = await sharedGoalMemberApi.getGoalUserMembership(goal.id, user.id) as any;
+        if (membership?.id) {
+          await sharedGoalMemberApi.delete(membership.id);
+          toast.success('ออกจากกลุ่มสำเร็จ');
+          
+          // Redirect to list page
+          router.push('/dashboard/shared-goals');
+        }
+      } catch (error: any) {
+        console.error('Error leaving group:', error);
+        toast.error(error.message || 'ไม่สามารถออกจากกลุ่มได้');
+      }
+    }
   };
 
   const copyGroupCode = async (code: string) => {
@@ -214,13 +472,16 @@ export default function SharedGoalDetailPage() {
     }
   };
 
-  const handleLeaveGroup = () => {
-    if (confirm('คุณแน่ใจหรือไม่ที่จะออกจากกลุ่มนี้?')) {
-      router.push('/dashboard/shared-goals');
-    }
-  };
-
-
+  if (loading) {
+    return (
+      <DashboardLayout>
+        <div className="flex flex-col items-center justify-center h-64">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900 dark:border-white mb-4"></div>
+          <p className="text-gray-600 dark:text-gray-400">กำลังโหลดข้อมูล...</p>
+        </div>
+      </DashboardLayout>
+    );
+  }
 
   if (!goal) {
     return (
@@ -675,7 +936,7 @@ export default function SharedGoalDetailPage() {
                     <div>
                       <span className="text-yellow-700 dark:text-yellow-300">เป้าหมายต่อเดือน:</span>
                       <span className="ml-2 text-yellow-900 dark:text-yellow-100">
-                        ฿{goal.monthlyTarget.toLocaleString()}
+                        ฿{(goal.monthlyTarget || 0).toLocaleString()}
                       </span>
                     </div>
                     <div>
@@ -690,23 +951,40 @@ export default function SharedGoalDetailPage() {
                         {goal.autoSave ? 'เปิดใช้งาน' : 'ปิดใช้งาน'}
                       </span>
                     </div>
+                    <div className="col-span-2">
+                      <span className="text-yellow-700 dark:text-yellow-300">บัญชีที่เชื่อมโยง:</span>
+                      <span className="ml-2 text-yellow-900 dark:text-yellow-100">
+                        {(goal as any).accountId ? (
+                          <>
+                            {accounts.find(acc => acc.id === (goal as any).accountId)?.name || 'กำลังโหลด...'}
+                            {' '}
+                            <span className="text-green-600 dark:text-green-400">✓ เชื่อมต่อแล้ว</span>
+                          </>
+                        ) : (
+                          <span className="text-gray-500 dark:text-gray-400">ยังไม่ได้เชื่อมต่อ</span>
+                        )}
+                      </span>
+                    </div>
                   </div>
                 </div>
 
-                {goal.createdBy === 'คุณ' && (
+                {goal.createdById === user?.id && (
                   <div className="space-y-4">
                     <h4 className="font-medium text-gray-900 dark:text-white">
                       การจัดการเป้าหมาย (เฉพาะผู้สร้าง)
                     </h4>
                     <div className="flex space-x-3">
-                      <button className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
-                        แก้ไขเป้าหมาย
+                      <button
+                        onClick={openEditModal}
+                        className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                      >
+                        ✏️ แก้ไขเป้าหมาย
                       </button>
-                      <button className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors">
-                        เปลี่ยนการตั้งค่า
-                      </button>
-                      <button className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors">
-                        ลบเป้าหมาย
+                      <button
+                        onClick={() => setShowDeleteModal(true)}
+                        className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                      >
+                        🗑️ ลบเป้าหมาย
                       </button>
                     </div>
                   </div>
@@ -907,6 +1185,30 @@ export default function SharedGoalDetailPage() {
                 </div>
 
                 <div className="bg-white dark:bg-gray-800 px-6 py-6">
+                  {/* Tab Navigation */}
+                  <div className="flex space-x-2 mb-6 p-1 bg-gray-100 dark:bg-gray-700 rounded-lg">
+                    <button
+                      onClick={() => setInviteTab('code')}
+                      className={`flex-1 px-4 py-2.5 rounded-lg font-semibold transition-all duration-200 ${
+                        inviteTab === 'code'
+                          ? 'bg-blue-500 text-white shadow-lg'
+                          : 'text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600'
+                      }`}
+                    >
+                      📋 แชร์รหัส
+                    </button>
+                    <button
+                      onClick={() => setInviteTab('email')}
+                      className={`flex-1 px-4 py-2.5 rounded-lg font-semibold transition-all duration-200 ${
+                        inviteTab === 'email'
+                          ? 'bg-blue-500 text-white shadow-lg'
+                          : 'text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600'
+                      }`}
+                    >
+                      ✉️ เชิญด้วยอีเมล
+                    </button>
+                  </div>
+
                   <div className="space-y-6">
                     {/* Goal Info */}
                     <div className="p-4 bg-blue-50 dark:bg-blue-900/30 rounded-xl border border-blue-200 dark:border-blue-700">
@@ -920,40 +1222,85 @@ export default function SharedGoalDetailPage() {
                       </div>
                     </div>
 
-                    {/* Group Code */}
-                    <div className="text-center">
-                      <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
-                        รหัสกลุ่ม
-                      </label>
-                      <div className="relative">
-                        <div className="bg-gradient-to-r from-blue-500 to-indigo-600 p-6 rounded-2xl">
-                          <div className="text-3xl font-bold text-white tracking-widest font-mono">
-                            {goal.groupCode}
+                    {/* Share Code Tab */}
+                    {inviteTab === 'code' && (
+                      <>
+                        {/* Group Code */}
+                        <div className="text-center">
+                          <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
+                            รหัสกลุ่ม
+                          </label>
+                          <div className="relative">
+                            <div className="bg-gradient-to-r from-blue-500 to-indigo-600 p-6 rounded-2xl">
+                              <div className="text-3xl font-bold text-white tracking-widest font-mono">
+                                {goal.groupCode}
+                              </div>
+                            </div>
+                            <button
+                              onClick={() => copyGroupCode(goal.groupCode)}
+                              disabled={isCopying}
+                              className="absolute top-2 right-2 w-8 h-8 bg-white/20 hover:bg-white/30 disabled:bg-white/10 rounded-lg flex items-center justify-center text-white transition-colors duration-200 disabled:cursor-not-allowed"
+                              title={isCopying ? "กำลังคัดลอก..." : copySuccess ? "คัดลอกแล้ว!" : "คัดลอกรหัส"}
+                            >
+                              {isCopying ? "⏳" : copySuccess ? "✅" : "📋"}
+                            </button>
                           </div>
                         </div>
-                        <button
-                          onClick={() => copyGroupCode(goal.groupCode)}
-                          disabled={isCopying}
-                          className="absolute top-2 right-2 w-8 h-8 bg-white/20 hover:bg-white/30 disabled:bg-white/10 rounded-lg flex items-center justify-center text-white transition-colors duration-200 disabled:cursor-not-allowed"
-                          title={isCopying ? "กำลังคัดลอก..." : copySuccess ? "คัดลอกแล้ว!" : "คัดลอกรหัส"}
-                        >
-                          {isCopying ? "⏳" : copySuccess ? "✅" : "📋"}
-                        </button>
-                      </div>
-                    </div>
 
-                    {/* Instructions */}
-                    <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-xl">
-                      <h4 className="font-semibold text-gray-800 dark:text-gray-200 mb-2">
-                        วิธีการใช้งาน
-                      </h4>
-                      <ol className="text-sm text-gray-600 dark:text-gray-400 space-y-1 list-decimal list-inside">
-                        <li>แชร์รหัสนี้ให้กับเพื่อนที่ต้องการเชิญ</li>
-                        <li>ให้เพื่อนกดปุ่ม "เข้าร่วมกลุ่ม" ในหน้าหลัก</li>
-                        <li>กรอกรหัสนี้ลงในช่องที่กำหนด</li>
-                        <li>เพื่อนจะเข้าร่วมกลุ่มสำเร็จ</li>
-                      </ol>
-                    </div>
+                        {/* Instructions */}
+                        <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-xl">
+                          <h4 className="font-semibold text-gray-800 dark:text-gray-200 mb-2">
+                            วิธีการใช้งาน
+                          </h4>
+                          <ol className="text-sm text-gray-600 dark:text-gray-400 space-y-1 list-decimal list-inside">
+                            <li>แชร์รหัสนี้ให้กับเพื่อนที่ต้องการเชิญ</li>
+                            <li>ให้เพื่อนกดปุ่ม "เข้าร่วมกลุ่ม" ในหน้าหลัก</li>
+                            <li>กรอกรหัสนี้ลงในช่องที่กำหนด</li>
+                            <li>เพื่อนจะเข้าร่วมกลุ่มสำเร็จ</li>
+                          </ol>
+                        </div>
+                      </>
+                    )}
+
+                    {/* Invite by Email Tab */}
+                    {inviteTab === 'email' && (
+                      <>
+                        {/* Email Input */}
+                        <div>
+                          <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
+                            อีเมลของเพื่อน
+                          </label>
+                          <input
+                            type="email"
+                            value={inviteEmail}
+                            onChange={(e) => setInviteEmail(e.target.value)}
+                            className="w-full px-4 py-3 border-2 border-gray-200 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 dark:bg-gray-700 dark:text-white"
+                            placeholder="example@email.com"
+                          />
+                        </div>
+
+                        {/* Instructions */}
+                        <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-xl">
+                          <h4 className="font-semibold text-gray-800 dark:text-gray-200 mb-2">
+                            ⚡ เชิญอัตโนมัติ
+                          </h4>
+                          <ul className="text-sm text-gray-600 dark:text-gray-400 space-y-1 list-disc list-inside">
+                            <li>ระบบจะค้นหาผู้ใช้จากอีเมลโดยอัตโนมัติ</li>
+                            <li>เพื่อนจะถูกเพิ่มเข้ากลุ่มทันที</li>
+                            <li>ไม่ต้องกรอกรหัสกลุ่ม</li>
+                          </ul>
+                        </div>
+
+                        {/* Invite Button */}
+                        <button
+                          onClick={handleInviteMember}
+                          disabled={isInviting || !inviteEmail}
+                          className="w-full px-6 py-3 bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-xl hover:from-blue-600 hover:to-indigo-700 disabled:from-gray-400 disabled:to-gray-500 transition-all duration-200 font-semibold shadow-lg disabled:cursor-not-allowed"
+                        >
+                          {isInviting ? '🔄 กำลังเชิญ...' : '✉️ ส่งคำเชิญ'}
+                        </button>
+                      </>
+                    )}
                   </div>
                 </div>
 
@@ -974,6 +1321,303 @@ export default function SharedGoalDetailPage() {
                         <span>{isCopying ? "⏳" : copySuccess ? "✅" : "📋"}</span>
                         <span>{isCopying ? "กำลังคัดลอก..." : copySuccess ? "คัดลอกแล้ว!" : "คัดลอกรหัส"}</span>
                       </span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Edit Goal Modal */}
+        {showEditModal && goal && (
+          <div className="fixed inset-0 z-50 overflow-y-auto">
+            <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+              <div 
+                className="fixed inset-0 transition-opacity backdrop-blur-sm" 
+                onClick={() => !isSaving && setShowEditModal(false)}
+              >
+                <div className="absolute inset-0 bg-gray-900/80 dark:bg-black/80"></div>
+              </div>
+
+              <div className="inline-block align-bottom bg-white dark:bg-gray-800 rounded-2xl text-left overflow-hidden shadow-2xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full relative z-10 border border-gray-200 dark:border-gray-700">
+                {/* Header */}
+                <div className="relative bg-gradient-to-r from-blue-500 to-indigo-600 px-6 py-4">
+                  <div className="absolute inset-0 bg-white/10 backdrop-blur-sm"></div>
+                  <div className="relative flex items-center justify-between">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
+                        <span className="text-white text-xl">✏️</span>
+                      </div>
+                      <h3 className="text-xl font-bold text-white">
+                        แก้ไขเป้าหมาย
+                      </h3>
+                    </div>
+                    <button
+                      onClick={() => !isSaving && setShowEditModal(false)}
+                      disabled={isSaving}
+                      className="w-8 h-8 bg-white/20 hover:bg-white/30 rounded-lg flex items-center justify-center text-white transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                </div>
+
+                <div className="bg-white dark:bg-gray-800 px-6 py-6">
+                  <div className="space-y-6">
+                    {/* Name */}
+                    <div className="group">
+                      <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center space-x-2">
+                        <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
+                        <span>ชื่อเป้าหมาย *</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={editName}
+                        onChange={(e) => setEditName(e.target.value)}
+                        className="w-full px-4 py-3 border-2 border-gray-200 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 dark:bg-gray-700 dark:text-white"
+                        placeholder="เช่น ซื้อบ้านร่วมกัน"
+                        maxLength={100}
+                      />
+                    </div>
+
+                    {/* Description */}
+                    <div className="group">
+                      <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center space-x-2">
+                        <span className="w-2 h-2 bg-green-500 rounded-full"></span>
+                        <span>คำอธิบาย</span>
+                      </label>
+                      <textarea
+                        value={editDescription}
+                        onChange={(e) => setEditDescription(e.target.value)}
+                        className="w-full px-4 py-3 border-2 border-gray-200 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all duration-200 dark:bg-gray-700 dark:text-white resize-none"
+                        placeholder="รายละเอียดเพิ่มเติม..."
+                        rows={3}
+                        maxLength={500}
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      {/* Target Amount */}
+                      <div className="group">
+                        <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center space-x-2">
+                          <span className="w-2 h-2 bg-emerald-500 rounded-full"></span>
+                          <span>จำนวนเงินเป้าหมาย *</span>
+                        </label>
+                        <div className="relative">
+                          <span className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-500 dark:text-gray-400 font-bold">฿</span>
+                          <input
+                            type="number"
+                            value={editTargetAmount}
+                            onChange={(e) => setEditTargetAmount(e.target.value)}
+                            className="w-full pl-10 pr-4 py-3 border-2 border-gray-200 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all duration-200 dark:bg-gray-700 dark:text-white font-semibold"
+                            placeholder="100,000"
+                            min="0"
+                            step="1000"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Target Date */}
+                      <div className="group">
+                        <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center space-x-2">
+                          <span className="w-2 h-2 bg-purple-500 rounded-full"></span>
+                          <span>วันที่เป้าหมาย *</span>
+                        </label>
+                        <input
+                          type="date"
+                          value={editTargetDate}
+                          onChange={(e) => setEditTargetDate(e.target.value)}
+                          className="w-full px-4 py-3 border-2 border-gray-200 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all duration-200 dark:bg-gray-700 dark:text-white"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Linked Account */}
+                    <div className="group">
+                      <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center space-x-2">
+                        <span className="w-2 h-2 bg-yellow-500 rounded-full"></span>
+                        <span>บัญชีที่เชื่อมโยง</span>
+                      </label>
+                      <select
+                        value={editAccountId}
+                        onChange={(e) => setEditAccountId(e.target.value)}
+                        className="w-full px-4 py-3 border-2 border-gray-200 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 transition-all duration-200 dark:bg-gray-700 dark:text-white"
+                      >
+                        <option value="">-- ไม่ระบุบัญชี --</option>
+                        {accounts.map((account) => (
+                          <option key={account.id} value={account.id}>
+                            {account.name} {account.bankName ? `(${account.bankName})` : ''} - ฿{(account.currentBalance || account.current_balance || 0).toLocaleString()}
+                          </option>
+                        ))}
+                      </select>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                        เลือกบัญชีที่จะหักเงินเมื่อฝากเข้าเป้าหมายนี้
+                      </p>
+                    </div>
+
+                    {/* Category (Read-only for now) */}
+                    <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-gray-600 dark:text-gray-400">หมวดหมู่:</span>
+                        <span className="text-sm font-medium text-gray-900 dark:text-white">{editCategory}</span>
+                      </div>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                        (ยังไม่สามารถเปลี่ยนหมวดหมู่ได้ในขณะนี้)
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-gradient-to-r from-gray-50/80 to-gray-100/80 dark:from-gray-700/80 dark:to-gray-800/80 px-6 py-4 border-t border-gray-200/50 dark:border-gray-600/50">
+                  <div className="flex space-x-4">
+                    <button
+                      onClick={() => !isSaving && setShowEditModal(false)}
+                      disabled={isSaving}
+                      className="flex-1 px-6 py-3 border-2 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-700 hover:border-gray-400 dark:hover:border-gray-500 transition-all duration-200 font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      ยกเลิก
+                    </button>
+                    <button
+                      onClick={handleEditGoal}
+                      disabled={isSaving || !editName || !editTargetAmount || !editTargetDate}
+                      className="flex-1 px-6 py-3 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 disabled:from-gray-400 disabled:to-gray-500 text-white rounded-xl transition-all duration-200 disabled:cursor-not-allowed font-semibold shadow-lg hover:shadow-xl disabled:shadow-none transform hover:scale-[1.02] disabled:scale-100"
+                    >
+                      {isSaving ? (
+                        <span className="flex items-center justify-center space-x-2">
+                          <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                          </svg>
+                          <span>กำลังบันทึก...</span>
+                        </span>
+                      ) : (
+                        <span className="flex items-center justify-center space-x-2">
+                          <span>💾</span>
+                          <span>บันทึกการเปลี่ยนแปลง</span>
+                        </span>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Delete Confirmation Modal */}
+        {showDeleteModal && goal && (
+          <div className="fixed inset-0 z-50 overflow-y-auto">
+            <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+              <div 
+                className="fixed inset-0 transition-opacity backdrop-blur-sm" 
+                onClick={() => !isDeleting && setShowDeleteModal(false)}
+              >
+                <div className="absolute inset-0 bg-gray-900/80 dark:bg-black/80"></div>
+              </div>
+
+              <div className="inline-block align-bottom bg-white dark:bg-gray-800 rounded-2xl text-left overflow-hidden shadow-2xl transform transition-all sm:my-8 sm:align-middle sm:max-w-md sm:w-full relative z-10 border border-gray-200 dark:border-gray-700">
+                {/* Header */}
+                <div className="relative bg-gradient-to-r from-red-500 to-rose-600 px-6 py-4">
+                  <div className="absolute inset-0 bg-white/10 backdrop-blur-sm"></div>
+                  <div className="relative flex items-center justify-between">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
+                        <span className="text-2xl">⚠️</span>
+                      </div>
+                      <h3 className="text-xl font-bold text-white">
+                        ยืนยันการลบเป้าหมาย
+                      </h3>
+                    </div>
+                    <button
+                      onClick={() => !isDeleting && setShowDeleteModal(false)}
+                      disabled={isDeleting}
+                      className="w-8 h-8 bg-white/20 hover:bg-white/30 rounded-lg flex items-center justify-center text-white transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                </div>
+
+                <div className="bg-white dark:bg-gray-800 px-6 py-6">
+                  {/* Warning Message */}
+                  <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/30 rounded-xl border border-red-200 dark:border-red-700">
+                    <div className="flex items-start space-x-3">
+                      <span className="text-2xl flex-shrink-0">🗑️</span>
+                      <div>
+                        <p className="text-red-800 dark:text-red-200 font-semibold mb-1">
+                          คุณกำลังจะลบเป้าหมาย
+                        </p>
+                        <p className="text-red-700 dark:text-red-300 text-sm">
+                          &quot;{goal.name}&quot;
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Goal Info */}
+                  <div className="space-y-3 mb-6">
+                    <div className="flex justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                      <span className="text-gray-600 dark:text-gray-400">เป้าหมาย:</span>
+                      <span className="font-medium text-gray-900 dark:text-white">
+                        ฿{goal.targetAmount.toLocaleString()}
+                      </span>
+                    </div>
+                    <div className="flex justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                      <span className="text-gray-600 dark:text-gray-400">ยอดปัจจุบัน:</span>
+                      <span className="font-medium text-gray-900 dark:text-white">
+                        ฿{goal.currentAmount.toLocaleString()}
+                      </span>
+                    </div>
+                    <div className="flex justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                      <span className="text-gray-600 dark:text-gray-400">สมาชิก:</span>
+                      <span className="font-medium text-gray-900 dark:text-white">
+                        {goal.members.length} คน
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Warning Text */}
+                  <div className="p-4 bg-yellow-50 dark:bg-yellow-900/30 border border-yellow-200 dark:border-yellow-700 rounded-lg">
+                    <p className="text-yellow-800 dark:text-yellow-200 text-sm font-medium mb-2">
+                      ⚠️ คำเตือน
+                    </p>
+                    <ul className="text-yellow-700 dark:text-yellow-300 text-sm space-y-1 list-disc list-inside">
+                      <li>การลบเป้าหมายจะไม่สามารถกู้คืนได้</li>
+                      <li>ข้อมูลสมาชิกและประวัติการฝากเงินจะถูกลบทั้งหมด</li>
+                      <li>สมาชิกทุกคนจะไม่สามารถเข้าถึงเป้าหมายนี้ได้อีก</li>
+                    </ul>
+                  </div>
+                </div>
+
+                <div className="bg-gradient-to-r from-gray-50/80 to-gray-100/80 dark:from-gray-700/80 dark:to-gray-800/80 px-6 py-4 border-t border-gray-200/50 dark:border-gray-600/50">
+                  <div className="flex space-x-4">
+                    <button
+                      onClick={() => !isDeleting && setShowDeleteModal(false)}
+                      disabled={isDeleting}
+                      className="flex-1 px-6 py-3 border-2 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-700 hover:border-gray-400 dark:hover:border-gray-500 transition-all duration-200 font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      ยกเลิก
+                    </button>
+                    <button
+                      onClick={handleDeleteGoal}
+                      disabled={isDeleting}
+                      className="flex-1 px-6 py-3 bg-gradient-to-r from-red-500 to-rose-600 hover:from-red-600 hover:to-rose-700 disabled:from-gray-400 disabled:to-gray-500 text-white rounded-xl transition-all duration-200 disabled:cursor-not-allowed font-semibold shadow-lg hover:shadow-xl disabled:shadow-none transform hover:scale-[1.02] disabled:scale-100"
+                    >
+                      {isDeleting ? (
+                        <span className="flex items-center justify-center space-x-2">
+                          <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                          </svg>
+                          <span>กำลังลบ...</span>
+                        </span>
+                      ) : (
+                        <span className="flex items-center justify-center space-x-2">
+                          <span>🗑️</span>
+                          <span>ยืนยันการลบ</span>
+                        </span>
+                      )}
                     </button>
                   </div>
                 </div>

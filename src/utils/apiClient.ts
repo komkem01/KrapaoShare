@@ -658,30 +658,45 @@ export const budgetApi = {
   }) => apiClient.get(`/budgets${buildQueryParams(filters)}`),
   
   create: (data: {
-    user_id: string;
-    category_id?: string;
+    userId: string;
+    categoryId?: string;
     name: string;
-    amount: number;
-    period_start: string;
-    period_end: string;
+    budgetAmount: number;
+    periodStart: string;
+    periodEnd: string;
     description?: string;
-    alert_threshold?: number;
+    // Backend fields ตาม JSON tags
+    budgetMonth?: number;
+    budgetYear?: number;
+    alertPercentage?: number;
+    periodType?: string;
+    isActive?: boolean;
+    autoRollover?: boolean;
+    spentAmount?: number;
   }) => apiClient.post('/budgets', data),
   
   getById: (id: string) => apiClient.get(`/budgets/${id}`),
   
   update: (id: string, data: {
-    category_id?: string;
+    categoryId?: string;
     name?: string;
-    amount?: number;
-    period_start?: string;
-    period_end?: string;
+    budgetAmount?: number;
+    periodStart?: string;
+    periodEnd?: string;
     description?: string;
-    alert_threshold?: number;
-    status?: string;
+    // Backend fields ตาม JSON tags
+    budgetMonth?: number;
+    budgetYear?: number;
+    alertPercentage?: number;
+    periodType?: string;
+    isActive?: boolean;
+    autoRollover?: boolean;
+    spentAmount?: number;
   }) => apiClient.patch(`/budgets/${id}`, data),
   
   delete: (id: string) => apiClient.delete(`/budgets/${id}`),
+  
+  getByUser: (userId: string) => apiClient.get(`/budgets/user/${userId}`),
 };
 
 // Bill API functions
@@ -755,58 +770,113 @@ export const billParticipantApi = {
 export const goalApi = {
   list: (filters?: {
     user_id?: string;
-    status?: 'active' | 'completed' | 'cancelled';
+    category_id?: string;
+    priority?: 'low' | 'medium' | 'high' | 'critical';
+    goal_type?: 'savings' | 'purchase' | 'debt_payoff';
+    is_completed?: boolean;
+    search?: string;
     page?: number;
     limit?: number;
   }) => apiClient.get(`/goals${buildQueryParams(filters)}`),
   
   create: (data: {
-    user_id: string;
+    userId: string;
+    categoryId?: string;
     name: string;
-    target_amount: number;
-    current_amount?: number;
-    target_date?: string;
     description?: string;
-    category?: string;
+    targetAmount: number;
+    currentAmount?: number;
+    targetDate?: string;
+    priority?: 'low' | 'medium' | 'high' | 'critical';
+    goalType?: 'savings' | 'purchase' | 'debt_payoff';
+    autoSaveAmount?: number;
+    autoSaveFrequency?: 'daily' | 'weekly' | 'monthly' | 'yearly';
+    isCompleted?: boolean;
+    completedAt?: string;
   }) => apiClient.post('/goals', data),
   
   getById: (id: string) => apiClient.get(`/goals/${id}`),
   
   update: (id: string, data: {
+    categoryId?: string;
     name?: string;
-    target_amount?: number;
-    current_amount?: number;
-    target_date?: string;
     description?: string;
-    category?: string;
-    status?: 'active' | 'completed' | 'cancelled';
+    targetAmount?: number;
+    currentAmount?: number;
+    targetDate?: string;
+    priority?: 'low' | 'medium' | 'high' | 'critical';
+    goalType?: 'savings' | 'purchase' | 'debt_payoff';
+    autoSaveAmount?: number;
+    autoSaveFrequency?: 'daily' | 'weekly' | 'monthly' | 'yearly';
+    isCompleted?: boolean;
+    completedAt?: string;
   }) => apiClient.patch(`/goals/${id}`, data),
   
   delete: (id: string) => apiClient.delete(`/goals/${id}`),
 };
 
-// Goal Contribution API functions
-export const goalContributionApi = {
+// Goal Deposit API functions (Personal Goals)
+export const goalDepositApi = {
   list: (filters?: {
     goal_id?: string;
     user_id?: string;
+    account_id?: string;
+    date_from?: string;
+    date_to?: string;
+    search?: string;
+    page?: number;
+    limit?: number;
+  }) => apiClient.get(`/goal-deposits${buildQueryParams(filters)}`),
+  
+  create: (data: {
+    goalId: string;
+    userId: string;
+    fromAccountId: string;
+    amount: number;
+    notes?: string;
+  }) => apiClient.post('/goal-deposits', data),
+  
+  getById: (id: string) => apiClient.get(`/goal-deposits/${id}`),
+  
+  update: (id: string, data: {
+    amount?: number;
+    depositDate?: string;
+    notes?: string;
+  }) => apiClient.patch(`/goal-deposits/${id}`, data),
+  
+  delete: (id: string) => apiClient.delete(`/goal-deposits/${id}`),
+};
+
+// Goal Contribution API functions (Shared Goals)
+export const goalContributionApi = {
+  list: (filters?: {
+    shared_goal_id?: string;
+    user_id?: string;
+    contribution_method?: 'manual' | 'transfer' | 'auto';
+    date_from?: string;
+    date_to?: string;
+    search?: string;
     page?: number;
     limit?: number;
   }) => apiClient.get(`/goal-contributions${buildQueryParams(filters)}`),
   
   create: (data: {
-    goal_id: string;
-    user_id: string;
+    sharedGoalId: string;
+    userId: string;
+    transactionId?: string;
     amount: number;
-    contribution_date?: string;
+    contributionDate: string;
+    contributionMethod?: 'manual' | 'transfer' | 'auto';
     notes?: string;
   }) => apiClient.post('/goal-contributions', data),
   
   getById: (id: string) => apiClient.get(`/goal-contributions/${id}`),
   
   update: (id: string, data: {
+    transactionId?: string;
     amount?: number;
-    contribution_date?: string;
+    contributionDate?: string;
+    contributionMethod?: 'manual' | 'transfer' | 'auto';
     notes?: string;
   }) => apiClient.patch(`/goal-contributions/${id}`, data),
   
@@ -827,25 +897,41 @@ export const sharedGoalApi = {
   }) => apiClient.get(`/shared-goals${buildQueryParams(filters)}`),
   
   create: (data: {
-    created_by: string;
+    createdByUserId: string;
+    accountId?: string;
+    categoryId?: string;
     name: string;
-    target_amount: number;
-    current_amount?: number;
-    target_date?: string;
+    targetAmount: number;
+    currentAmount?: number;
+    targetDate?: string;
     description?: string;
-    category?: string;
-    share_code?: string;
+    goalType?: 'group_savings' | 'group_purchase' | 'event_fund';
+    shareCode?: string;
+    autoSave?: boolean;
+    minimumContribution?: number;
+    maximumMembers?: number;
+    isActive?: boolean;
+    isCompleted?: boolean;
+    completedAt?: string;
   }) => apiClient.post('/shared-goals', data),
   
   getById: (id: string) => apiClient.get(`/shared-goals/${id}`),
   
   update: (id: string, data: {
+    accountId?: string;
+    categoryId?: string;
     name?: string;
-    target_amount?: number;
-    current_amount?: number;
-    target_date?: string;
+    targetAmount?: number;
+    currentAmount?: number;
+    targetDate?: string;
     description?: string;
-    category?: string;
+    goalType?: 'group_savings' | 'group_purchase' | 'event_fund';
+    autoSave?: boolean;
+    minimumContribution?: number;
+    maximumMembers?: number;
+    isActive?: boolean;
+    isCompleted?: boolean;
+    completedAt?: string;
     status?: 'active' | 'completed' | 'cancelled';
   }) => apiClient.patch(`/shared-goals/${id}`, data),
   
@@ -862,17 +948,22 @@ export const sharedGoalMemberApi = {
   }) => apiClient.get(`/shared-goal-members${buildQueryParams(filters)}`),
   
   create: (data: {
-    shared_goal_id: string;
-    user_id: string;
-    contribution_amount?: number;
-    role?: 'owner' | 'member';
+    sharedGoalId: string;
+    userId: string;
+    contributionAmount?: number;
+    targetContribution?: number;
+    role?: 'admin' | 'member';
+    invitedBy?: string;
+    isActive?: boolean;
   }) => apiClient.post('/shared-goal-members', data),
   
   getById: (id: string) => apiClient.get(`/shared-goal-members/${id}`),
   
   update: (id: string, data: {
-    contribution_amount?: number;
-    role?: 'owner' | 'member';
+    contributionAmount?: number;
+    targetContribution?: number;
+    role?: 'admin' | 'member';
+    isActive?: boolean;
   }) => apiClient.patch(`/shared-goal-members/${id}`, data),
   
   delete: (id: string) => apiClient.delete(`/shared-goal-members/${id}`),
@@ -883,6 +974,11 @@ export const sharedGoalMemberApi = {
   
   getGoalUserMembership: (goalId: string, userId: string) =>
     apiClient.get(`/shared-goal-members/goal/${goalId}/user/${userId}`),
+  
+  inviteByEmail: (data: {
+    sharedGoalId: string;
+    email: string;
+  }) => apiClient.post('/shared-goal-members/invite-by-email', data),
 };
 
 // Debt API functions

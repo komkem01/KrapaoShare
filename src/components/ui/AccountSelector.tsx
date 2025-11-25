@@ -3,9 +3,9 @@
 import { useState, useRef, useEffect } from 'react';
 
 export interface Account {
-  id: number;
+  id: number | string;
   name: string;
-  type: 'personal' | 'shared';
+  type: 'personal' | 'shared' | 'business';
   balance: number;
   bank: string;
   accountNumber: string;
@@ -13,7 +13,7 @@ export interface Account {
 
 interface AccountSelectorProps {
   accounts: Account[];
-  selectedAccountId?: number | null;
+  selectedAccountId?: number | string | null;
   onSelect: (account: Account) => void;
   placeholder?: string;
   className?: string;
