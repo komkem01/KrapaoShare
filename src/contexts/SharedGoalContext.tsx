@@ -110,8 +110,12 @@ export const SharedGoalProvider: React.FC<{ children: React.ReactNode }> = ({
     if (!user?.id) throw new Error("User not authenticated");
 
     const newGoal = await sharedGoalApi.create({
-      ...data,
-      created_by: user.id,
+      createdByUserId: user.id,
+      name: data.name,
+      targetAmount: data.target_amount,
+      targetDate: data.target_date,
+      description: data.description,
+      shareCode: data.share_code,
     }) as SharedGoal;
 
     setSharedGoals((prev) => [...prev, newGoal]);
@@ -135,7 +139,11 @@ export const SharedGoalProvider: React.FC<{ children: React.ReactNode }> = ({
   const addMember = async (
     data: Omit<SharedGoalMember, "id" | "created_at" | "updated_at" | "contribution_amount" | "joined_at">
   ): Promise<SharedGoalMember> => {
-    const newMember = await sharedGoalMemberApi.create(data) as SharedGoalMember;
+    const newMember = await sharedGoalMemberApi.create({
+      sharedGoalId: data.shared_goal_id,
+      userId: data.user_id,
+      role: data.role === 'owner' ? 'admin' : data.role,
+    }) as SharedGoalMember;
     setMembers((prev) => [...prev, newMember]);
     return newMember;
   };
@@ -144,7 +152,21 @@ export const SharedGoalProvider: React.FC<{ children: React.ReactNode }> = ({
     id: string,
     data: Partial<SharedGoalMember>
   ): Promise<SharedGoalMember> => {
-    const updated = await sharedGoalMemberApi.update(id, data) as SharedGoalMember;
+    const updateData: {
+      contributionAmount?: number;
+      targetContribution?: number;
+      role?: 'admin' | 'member';
+      isActive?: boolean;
+    } = {};
+
+    if (data.contribution_amount !== undefined) {
+      updateData.contributionAmount = data.contribution_amount;
+    }
+    if (data.role !== undefined) {
+      updateData.role = data.role === 'owner' ? 'admin' : data.role;
+    }
+
+    const updated = await sharedGoalMemberApi.update(id, updateData) as SharedGoalMember;
     setMembers((prev) => prev.map((m) => (m.id === id ? updated : m)));
     return updated;
   };
